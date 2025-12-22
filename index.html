@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>G-Code Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- OpenCV.js -->
@@ -22,7 +22,7 @@
         .card { background: #202124; border: 1px solid #3c4043; border-radius: 12px; }
         
         /* Custom Scrollbar Dark */
-        ::-webkit-scrollbar { width: 4px; height: 4px; background: #000; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; background: #000; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #5f6368; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #80868b; }
@@ -64,168 +64,196 @@
     <!-- Loading Screen -->
     <div id="loading" class="loading-overlay">
         <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div class="text-xl font-medium text-gray-300">Init Vision Engine...</div>
+        <div class="text-xl font-medium text-gray-300">Vision Engine Initializing...</div>
     </div>
 
     <!-- Hidden File Input for Video Upload -->
     <input type="file" id="videoUploadInput" accept="video/*" class="hidden" onchange="handleVideoUpload(this)">
 
     <!-- Header -->
-    <header class="bg-black border-b border-gray-800 h-14 md:h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-10">
-        <div class="flex items-center gap-2 md:gap-3">
-            <h1 class="text-lg md:text-xl font-medium text-gray-200 truncate">G-code Gen <span class="text-xs text-gray-500 ml-1 font-mono">BETA</span></h1>
+    <header class="bg-black border-b border-gray-800 h-16 flex items-center justify-between px-6 shrink-0 z-10">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-blue-400 font-bold text-xl border border-blue-400/30">V</div>
+            <h1 class="text-xl font-medium text-gray-200">Vision Lab <span class="text-xs text-gray-500 ml-2 font-mono">BETA</span></h1>
         </div>
-        <div class="flex gap-2">
-            <!-- Mobile Compact Controls -->
-            <button id="startCamBtn" class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-colors shadow-sm flex items-center gap-2">
+        <div class="flex gap-3">
+            <!-- Source Controls -->
+            <button id="startCamBtn" class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                <span class="hidden md:inline">Camera</span>
+                Camera
             </button>
-            <button onclick="document.getElementById('videoUploadInput').click()" class="border border-gray-600 text-gray-300 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-colors flex items-center gap-2">
+            <button onclick="document.getElementById('videoUploadInput').click()" class="border border-gray-600 hover:border-gray-400 text-gray-300 hover:text-white px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Upload Video
             </button>
             
-            <div class="w-px h-6 bg-gray-700 mx-1 self-center"></div>
+            <div class="w-px h-6 bg-gray-700 mx-2 self-center"></div>
 
-            <button onclick="resetApp()" class="text-gray-400 hover:text-white p-1.5 rounded-full transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <!-- Action Controls -->
+            <button onclick="resetApp()" class="text-gray-400 hover:text-white px-3 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
             </button>
-            
-            <!-- Export Dropdown for Mobile? Simplified: Just Export Gcode for now on mobile, kept both for desktop -->
-            <div class="hidden md:flex gap-2">
-                 <button onclick="exportDxf()" class="bg-[#303134] border border-gray-600 text-gray-200 px-3 py-1.5 rounded-full text-xs font-medium">DXF</button>
-                 <button onclick="exportGcode()" class="bg-[#303134] border border-gray-600 text-gray-200 px-3 py-1.5 rounded-full text-xs font-medium">G-CODE</button>
-            </div>
-            <!-- Mobile Export Icon -->
-            <button onclick="exportGcode()" class="md:hidden bg-[#303134] border border-gray-600 text-gray-200 px-3 py-1.5 rounded-full text-xs font-medium flex items-center">
-                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <button onclick="exportDxf()" class="bg-[#303134] border border-gray-600 hover:bg-[#3c4043] text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                Export DXF
+            </button>
+            <button onclick="exportGcode()" class="bg-[#303134] border border-gray-600 hover:bg-[#3c4043] text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Export
             </button>
         </div>
     </header>
 
-    <!-- Main Layout: Stacked on Mobile, Row on Desktop -->
-    <div class="flex flex-1 flex-col md:flex-row overflow-hidden">
+    <!-- Main Layout -->
+    <div class="flex flex-1 overflow-hidden">
         
-        <!-- Sidebar: Vision & Settings (Top on Mobile, Left on Desktop) -->
-        <aside class="w-full md:w-80 h-1/2 md:h-full bg-black md:border-r border-b md:border-b-0 border-gray-800 flex flex-col overflow-y-auto shrink-0 z-10 order-1">
-            <div class="p-4 space-y-4">
+        <!-- Left Sidebar: Vision & Settings (Restored Width and Padding) -->
+        <aside class="w-96 bg-black border-r border-gray-800 flex flex-col overflow-y-auto z-10 shrink-0">
+            <div class="p-5 space-y-6">
                 
                 <!-- Vision Preview Card -->
-                <div class="card p-3 space-y-2">
+                <div class="card p-4 space-y-3">
                     <div class="flex justify-between items-center">
-                        <h3 class="font-medium text-gray-400 text-[10px] md:text-xs uppercase tracking-wider">Feed</h3>
-                        <span class="text-[10px] text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded" id="statusBadge">IDLE</span>
+                        <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Source Feed</h3>
+                        <span class="text-xs text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded" id="statusBadge">IDLE</span>
                     </div>
                     <div class="relative aspect-video bg-black rounded border border-gray-700 overflow-hidden group">
                         <video id="videoInput" class="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" muted playsinline></video>
                         <canvas id="canvasOutput" class="vision-canvas relative z-10"></canvas>
                         <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" id="camPlaceholder">
+                            <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mb-2">
+                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </div>
                             <span class="text-gray-600 text-xs font-mono">NO SIGNAL</span>
                         </div>
                     </div>
                     
-                    <div class="space-y-3 pt-1">
-                        <div class="grid grid-cols-2 gap-2">
-                             <div>
-                                <label class="text-[10px] text-gray-500 font-mono block mb-1">MODE</label>
-                                <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded px-2 py-1 text-xs focus:border-[#8ab4f8] outline-none">
-                                    <option value="CYLINDER">Cylinder</option>
-                                    <option value="SHAPE">Shape</option>
-                                </select>
+                    <div class="space-y-4 pt-2">
+                        <!-- Mode Select -->
+                        <div>
+                             <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
+                                <span>GENERATION MODE</span>
                             </div>
-                             <div>
-                                <label class="text-[10px] text-gray-500 font-mono block mb-1">INTENSITY</label>
-                                <input type="range" id="textureDepth" min="0" max="10" step="0.1" value="5.0" class="w-full h-4">
-                            </div>
+                            <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded p-2 text-sm focus:border-[#8ab4f8] outline-none">
+                                <option value="CYLINDER">Cylinder Texture (Vase)</option>
+                                <option value="SHAPE">Shape Scan (Legacy)</option>
+                            </select>
                         </div>
 
-                        <div class="border-t border-gray-700 pt-2">
-                            <label class="text-[10px] text-gray-500 font-mono block mb-1">THRESHOLDS</label>
-                            <div class="flex gap-2">
-                                <input type="range" id="threshold1" min="0" max="255" value="50" class="flex-1">
-                                <input type="range" id="threshold2" min="0" max="255" value="150" class="flex-1">
+                        <div>
+                            <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
+                                <span>TEXTURE INTENSITY</span>
+                                <span id="val-tex" class="text-gray-300">5.0</span>
+                            </div>
+                            <input type="range" id="textureDepth" min="0" max="10" step="0.1" value="5.0">
+                        </div>
+
+                        <div class="border-t border-gray-700 pt-4">
+                            <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
+                                <span>CANNY THRESHOLD</span>
+                            </div>
+                            <div class="space-y-2">
+                                <input type="range" id="threshold1" min="0" max="255" value="50">
+                                <input type="range" id="threshold2" min="0" max="255" value="150">
                             </div>
                         </div>
                     </div>
                     
                     <!-- Main Action Button -->
-                    <button id="toggleScanBtn" class="w-full bg-[#303134] text-[#8ab4f8] hover:bg-[#3c4043] border border-gray-600 py-2 md:py-3 rounded-lg text-xs md:text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed flex justify-center items-center gap-2" disabled>
+                    <button id="toggleScanBtn" class="w-full bg-[#303134] text-[#8ab4f8] hover:bg-[#3c4043] border border-gray-600 py-3 rounded-lg text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed flex justify-center items-center gap-2" disabled>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>START BUILD</span>
                     </button>
                 </div>
 
-                <!-- Print Settings Card -->
-                <div class="card p-3 space-y-3">
+                <!-- Print Settings Card (Restored Full Layout) -->
+                <div class="card p-4 space-y-4">
                     <div class="flex justify-between items-center border-b border-gray-700 pb-2">
                         <div class="flex items-center gap-2">
-                            <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Params</h3>
+                            <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Parameters</h3>
                             <button onclick="fitView()" class="text-[#8ab4f8] hover:text-white p-1 rounded hover:bg-gray-700" title="Fit View">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18M3 21h18M12 8v8m-4-4h8"></path></svg>
                             </button>
                         </div>
-                        <label class="flex items-center gap-1.5 text-[10px] text-gray-400 cursor-pointer select-none">
-                            <input type="checkbox" id="showBounds" checked onchange="toggleBoundingBox()" class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
-                            Box
-                        </label>
+                        <div class="flex gap-3">
+                             <!-- Base Gen Toggle Removed as per request, logic removed from code -->
+                             <!-- Only Box Toggle remains -->
+                            <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+                                <input type="checkbox" id="showBounds" checked onchange="toggleBoundingBox()" class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
+                                Show Box
+                            </label>
+                        </div>
                     </div>
                     
-                    <div class="grid grid-cols-3 md:grid-cols-2 gap-2">
-                        <div class="space-y-0.5">
-                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Size(mm)</label>
-                            <input type="number" id="targetWidth" value="240" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
+                    <!-- 2-Column Grid with comfortable spacing -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Bed/Box Width (mm)</label>
+                            <input type="number" id="targetWidth" value="240" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
                         </div>
-                        <div class="space-y-0.5">
-                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Max H</label>
-                            <input type="number" id="modelHeight" value="240.0" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Max Height (mm)</label>
+                            <input type="number" id="modelHeight" value="240.0" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
                         </div>
-                        <div class="space-y-0.5">
-                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Layer</label>
-                            <input type="number" id="layerHeight" value="0.2" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Layer Height (mm)</label>
+                            <input type="number" id="layerHeight" value="0.2" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
                         </div>
-                        <div class="space-y-0.5">
-                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Nozzle</label>
-                            <select id="nozzleDia" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8] outline-none">
-                                <option value="0.2">0.2</option>
-                                <option value="0.4" selected>0.4</option>
-                                <option value="0.6">0.6</option>
-                                <option value="0.8">0.8</option>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Nozzle Dia (mm)</label>
+                            <select id="nozzleDia" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] outline-none">
+                                <option value="0.2">0.2 mm</option>
+                                <option value="0.4" selected>0.4 mm</option>
+                                <option value="0.6">0.6 mm</option>
+                                <option value="0.8">0.8 mm</option>
                             </select>
                         </div>
-                        <div class="space-y-0.5">
-                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Flow</label>
-                            <input type="number" id="flowRatio" value="1.5" step="0.1" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
+                        <!-- Restored Filament Input -->
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Filament (mm)</label>
+                            <input type="number" id="filDia" value="1.75" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
                         </div>
-                        <div class="space-y-0.5">
-                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Scan Delay</label>
-                            <input type="number" id="scanSpeed" value="100" step="10" min="20" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
+                        <!-- Restored Flow Ratio Input -->
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Flow Ratio</label>
+                            <input type="number" id="flowRatio" value="1.5" step="0.1" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
                         </div>
-                         <!-- Hidden Print Speed & Fil Dia for simpler UI, can be hardcoded or added back if needed -->
-                         <input type="hidden" id="printSpeed" value="1200">
-                         <input type="hidden" id="filDia" value="1.75">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Print Speed (mm/min)</label>
+                            <input type="number" id="printSpeed" value="1200" step="100" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Scan Delay (ms)</label>
+                            <input type="number" id="scanSpeed" value="100" step="10" min="20" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
                     </div>
                 </div>
 
             </div>
         </aside>
 
-        <!-- Main: 3D Visualization (Bottom on Mobile, Right on Desktop) -->
-        <main class="w-full md:flex-1 h-1/2 md:h-full relative bg-black order-2">
+        <!-- Right: 3D Visualization -->
+        <main class="flex-1 relative bg-black">
             <div id="canvas3d-container" class="absolute inset-0"></div>
             
             <!-- Live Status Overlay -->
-            <div id="liveStatus" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#202124]/90 backdrop-blur rounded-full border border-gray-700 px-4 py-1.5 flex items-center gap-3 hidden z-20 shadow-lg">
-                <div class="flex items-center gap-1.5">
-                    <div class="w-1.5 h-1.5 rounded-full bg-[#f28b82] animate-pulse"></div>
-                    <span class="text-[10px] font-bold text-gray-300 tracking-wide">ACTIVE</span>
+            <div id="liveStatus" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#202124]/90 backdrop-blur rounded-full border border-gray-700 px-4 py-2 flex items-center gap-4 hidden z-20 shadow-lg">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-[#f28b82] animate-pulse"></div>
+                    <span class="text-xs font-bold text-gray-300 tracking-wide">BUILDING</span>
                 </div>
-                <div class="h-3 w-px bg-gray-600"></div>
-                <div class="text-[10px] text-gray-400 font-mono flex gap-2">
-                    <span>Z: <span id="currentZDisplay" class="text-white">0.0</span></span>
+                <div class="h-4 w-px bg-gray-600"></div>
+                <div class="text-xs text-gray-400 font-mono flex gap-3">
+                    <span>Z: <span id="currentZDisplay" class="text-white">0.00</span></span>
+                    <span>L: <span id="currentLayerDisplay" class="text-white">0</span></span>
                 </div>
-                <div class="h-3 w-px bg-gray-600"></div>
-                <div class="text-[10px] text-gray-400 font-mono">
-                    <span id="estTimeDisplay" class="text-[#8ab4f8]">0m</span>
+                <div class="h-4 w-px bg-gray-600"></div>
+                <div class="text-xs text-gray-400 font-mono">
+                    <span id="estTimeDisplay" class="text-[#8ab4f8]">00:00</span>
+                </div>
+                <div class="h-4 w-px bg-gray-600"></div>
+                <div class="text-xs text-gray-400 font-mono">
+                    <span id="estFilamentDisplay" class="text-[#8ab4f8]">0m / 0g</span>
                 </div>
             </div>
             
@@ -281,14 +309,15 @@
     const sliderTex = document.getElementById('textureDepth');
     const modeSelect = document.getElementById('generationMode');
     
+    const labelTex = document.getElementById('val-tex');
     const statusBadge = document.getElementById('statusBadge');
     const camPlaceholder = document.getElementById('camPlaceholder');
     const liveStatus = document.getElementById('liveStatus');
     const zDisplay = document.getElementById('currentZDisplay');
-    // const layerDisplay = document.getElementById('currentLayerDisplay');
+    const layerDisplay = document.getElementById('currentLayerDisplay');
     // const gcodeCountDisplay = document.getElementById('gcodeCountDisplay'); 
     const estTimeDisplay = document.getElementById('estTimeDisplay');
-    // const estFilamentDisplay = document.getElementById('estFilamentDisplay');
+    const estFilamentDisplay = document.getElementById('estFilamentDisplay');
 
     // --- Initialization ---
 
@@ -299,6 +328,8 @@
         startBtn.disabled = false;
         initThreeJS();
     }
+
+    sliderTex.oninput = () => labelTex.innerText = sliderTex.value;
 
     // --- Vision Logic ---
 
@@ -353,7 +384,7 @@
                 isVideoFile = false;
 
                 enableUI(true);
-                startBtn.innerHTML = `<span class="hidden md:inline">Stop</span><span class="md:hidden">Stop</span>`;
+                startBtn.innerHTML = `Stop`;
                 startBtn.classList.replace('bg-[#8ab4f8]', 'bg-[#f28b82]'); 
                 startBtn.classList.replace('text-[#202124]', 'text-[#202124]');
                 startBtn.classList.replace('hover:bg-[#aecbfa]', 'hover:bg-[#f6aea9]');
@@ -393,11 +424,11 @@
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         
         enableUI(false);
-        startBtn.innerHTML = `<span class="hidden md:inline">Camera</span><span class="md:hidden">Cam</span>`;
-        startBtn.className = "bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2";
+        startBtn.innerHTML = `Camera`;
+        startBtn.className = "bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2";
         
         statusBadge.innerText = "IDLE";
-        statusBadge.className = "text-[10px] text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded";
+        statusBadge.className = "text-xs text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded";
     }
 
     function enableUI(enabled) {
@@ -459,13 +490,16 @@
     function startScanning() {
         if(!streaming) return alert("Please start camera source first.");
         
+        // --- VIDEO REPLAY & RESET ---
         if(isVideoFile) {
             if (video.paused || video.ended) {
                 video.currentTime = 0;
                 video.play();
+                // Reset logic handled below
             }
         }
         
+        // Reset State
         isScanning = true;
         consecutiveEmptyLayers = 0;
         lastValidPolygon = null;
@@ -477,7 +511,8 @@
         currentLayer = 0;
         
         if(livePrintMesh) livePrintMesh.geometry.setDrawRange(0, 0);
-        zDisplay.innerText = "0.0";
+        zDisplay.innerText = "0.00";
+        layerDisplay.innerText = "0";
         updateStatsUI();
         nozzleMesh.position.set(0,0,0);
 
@@ -557,8 +592,17 @@
         
         let timeStr = "";
         if(h > 0) timeStr += `${h}h `;
-        timeStr += `${m}m`; // Simplified for mobile
+        timeStr += `${m}m ${s}s`;
         estTimeDisplay.innerText = timeStr;
+
+        let meters = (totalFilamentMM / 1000).toFixed(2);
+        
+        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
+        const area = Math.PI * Math.pow(filDia/2, 2);
+        const volumeCM3 = (totalFilamentMM * area) / 1000;
+        const weight = (volumeCM3 * 1.24).toFixed(1);
+        
+        estFilamentDisplay.innerText = `${meters}m / ${weight}g`;
     }
 
     function processOneLayer() {
@@ -595,20 +639,26 @@
             if (contours.size() > 0) {
                  for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
+                    // FIX: Ensure cnt exists and DELETE it after use
                     if(cnt) {
                         const data = cnt.data32S;
                         if(data) {
                             for (let j = 0; j < data.length; j += 2) {
                                 let px = data[j];
                                 let py = data[j+1];
+                                
                                 let dx = px - center.x;
                                 let dy = py - center.y;
                                 let dist = Math.sqrt(dx*dx + dy*dy);
+                                
                                 totalDist += dist;
                                 activePoints++;
+
                                 let angle = Math.atan2(dy, dx); 
                                 if(angle < 0) angle += Math.PI * 2;
+                                
                                 let bin = Math.floor((angle / (Math.PI * 2)) * numSegments) % numSegments;
+                                
                                 let normDist = dist / (video.width/2);
                                 if(normDist > radii[bin]) radii[bin] = normDist;
                             }
@@ -629,9 +679,12 @@
                 let idx = i % numSegments;
                 let angle = (i / numSegments) * Math.PI * 2;
                 let r = baseRadius + layerThicknessOffset + (radii[idx] * textureFactor * 5.0); 
+                
                 if (r > absoluteMaxRadius) r = absoluteMaxRadius;
+
                 let finalX = (bedSize / 2) + (Math.cos(angle) * r);
                 let finalY = (bedSize / 2) + (Math.sin(angle) * r);
+
                 layerPoints.push({ x: finalX, y: finalY });
             }
         } 
@@ -643,6 +696,7 @@
              if(contours.size() > 0) {
                 for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
+                    // FIX: Ensure cnt exists and DELETE it after use
                     if(cnt) {
                         let area = cv.contourArea(cnt);
                         if (area > 100 && area > maxArea) {
@@ -668,6 +722,7 @@
             if (bestPoly) {
                 lastValidPolygon = bestPoly; 
                 consecutiveEmptyLayers = 0; 
+
                 let scaleFactor = bedSize / video.videoWidth; 
                 const centerX = bedSize / 2;
                 const centerY = (video.videoHeight * scaleFactor) / 2; 
@@ -676,12 +731,14 @@
                 let transformedPoly = bestPoly.map(p => {
                     let relX = (p.x * scaleFactor) - centerX;
                     let relY = (p.y * scaleFactor) - centerY; 
+                    
                     let dist = Math.sqrt(relX*relX + relY*relY);
                     if(dist > maxR) {
                         let ratio = maxR / dist;
                         relX *= ratio;
                         relY *= ratio;
                     }
+                    
                     return {
                         x: (bedSize / 2) + relX,
                         y: (bedSize / 2) - relY 
@@ -717,7 +774,7 @@
                     add3DLine(
                         {x:layerPoints[i-1].x, y:layerPoints[i-1].y, z:currentZ}, 
                         {x:p.x, y:p.y, z:currentZ}, 
-                        true
+                        true, 'wall'
                     );
                 }
             }
@@ -734,6 +791,7 @@
             currentLayer++;
             
             zDisplay.innerText = currentZ.toFixed(2);
+            layerDisplay.innerText = currentLayer;
 
         } else {
             consecutiveEmptyLayers++;
@@ -749,9 +807,11 @@
     function initThreeJS() {
         const container = document.getElementById('canvas3d-container');
         scene = new THREE.Scene();
-        scene.background = new THREE.Color('#000000'); 
+        scene.background = new THREE.Color('#000000'); // Pure Black
+        // Increased Fog distance to allow seeing large objects
         scene.fog = new THREE.Fog('#000000', 100, 2000); 
 
+        // Increased Camera Far clip to 5000
         camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 5000);
         camera.position.set(0, -120, 100);
         camera.up.set(0, 0, 1);
@@ -763,27 +823,31 @@
 
         controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.autoRotate = false; 
+        controls.autoRotate = false; // Disable auto rotate for manual inspection
         controls.dampingFactor = 0.1;
 
+        // Dark Lighting
         const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.4);
         scene.add(hemi);
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(50, -50, 100);
         scene.add(dirLight);
 
+        // Bed (Minimalist) - Made grid slightly brighter for visibility
         gridHelper = new THREE.GridHelper(220, 44, 0x555555, 0x222222); 
         gridHelper.rotation.x = Math.PI / 2;
         scene.add(gridHelper);
         
-        const nozzleGeo = new THREE.SphereGeometry(0.8, 16, 16); 
-        const nozzleMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); 
+        // Nozzle (Small White Dot)
+        const nozzleGeo = new THREE.SphereGeometry(0.8, 16, 16); // Small sphere
+        const nozzleMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Bright white unlit
         nozzleMesh = new THREE.Mesh(nozzleGeo, nozzleMat);
         scene.add(nozzleMesh);
 
         initDynamicGeometry();
         initBoundsHelper();
         
+        // Ensure initial fit
         setTimeout(updateSceneDimensions, 100);
 
         window.addEventListener('resize', onWindowResize, false);
@@ -791,16 +855,20 @@
     }
 
     function initBoundsHelper() {
+        // Create Bounding Box Visual
         const w = parseFloat(document.getElementById('targetWidth').value);
         const h = parseFloat(document.getElementById('modelHeight').value);
         
         const geometry = new THREE.BoxGeometry(w, w, h);
+        // Translate geometry so bottom sits on 0
         geometry.translate(w/2, w/2, h/2); 
         
         const edges = new THREE.EdgesGeometry(geometry);
+        // Made Color Brighter (0x888888) and Opacity Higher (0.5)
         boundsBox = new THREE.LineSegments(edges, new THREE.LineBasicMaterial( { color: 0x888888, transparent: true, opacity: 0.5, depthTest: false } ));
         scene.add(boundsBox);
         
+        // Sync visibility
         toggleBoundingBox();
     }
 
@@ -808,6 +876,7 @@
         const w = parseFloat(document.getElementById('targetWidth').value);
         const h = parseFloat(document.getElementById('modelHeight').value);
         
+        // 1. Rebuild Bounding Box
         if(boundsBox) {
             boundsBox.geometry.dispose();
             const geometry = new THREE.BoxGeometry(w, w, h);
@@ -815,16 +884,20 @@
             boundsBox.geometry = new THREE.EdgesGeometry(geometry);
         }
         
+        // 2. Update Grid Helper to match base dimension + 20% margin
         if(gridHelper) {
             scene.remove(gridHelper);
+            // Size: max of w, or standard min 200. Divisions: every 10mm approx
             let gridSize = Math.max(w * 1.5, 200);
             let divisions = Math.floor(gridSize / 10);
             gridHelper = new THREE.GridHelper(gridSize, divisions, 0x555555, 0x222222);
             gridHelper.rotation.x = Math.PI / 2;
+            // Grid is centered at 0,0 by default. Move to center of bed.
             gridHelper.position.set(w/2, w/2, 0);
             scene.add(gridHelper);
         }
 
+        // 3. Auto Fit Camera
         fitView();
     }
     
@@ -834,12 +907,16 @@
         const h = parseFloat(document.getElementById('modelHeight').value);
         
         const size = Math.max(w, h);
-        const center = new THREE.Vector3(w/2, w/2, h/2); 
+        const center = new THREE.Vector3(w/2, w/2, h/2); // Center of volume
         
+        // Calculate distance to fit object
         const fov = camera.fov * (Math.PI / 180);
-        let dist = Math.abs(size / Math.tan(fov / 2)) * 1.5; 
+        let dist = Math.abs(size / Math.tan(fov / 2)) * 1.5; // Increased buffer
+        
+        // Clamp min distance to avoid clipping
         dist = Math.max(dist, 100);
 
+        // Move camera to a nice isometric-ish angle
         const offset = new THREE.Vector3(0, -dist, dist * 0.6); 
         
         camera.position.copy(center).add(offset);
@@ -862,6 +939,7 @@
         geometry.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
         geometry.setDrawRange(0, 0);
 
+        // Brighter Blue for lines against black
         const material = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2, transparent: true, opacity: 0.9 });
         livePrintMesh = new THREE.LineSegments(geometry, material);
         livePrintMesh.frustumCulled = false; 
@@ -883,8 +961,13 @@
         linePositions[drawCount * 3 + 4] = p2.y;
         linePositions[drawCount * 3 + 5] = p2.z;
 
-        // Default Blue
+        // Default Blue: #8ab4f8 -> RGB: 0.54, 0.70, 0.97
         let col = {r:0.54, g:0.70, b:0.97}; 
+        
+        // Base Color: Bright Green #4caf50 -> RGB: 0.30, 0.69, 0.31
+        if (type === 'base') {
+            col = {r:0.30, g:0.69, b:0.31};
+        }
         
         for(let i=0; i<2; i++) { 
             lineColors[(drawCount + i) * 3] = col.r;
@@ -907,12 +990,14 @@
         
         livePrintMesh.geometry.setDrawRange(0, 0);
         
-        zDisplay.innerText = "0.0";
+        zDisplay.innerText = "0.00";
+        layerDisplay.innerText = "0";
         
         totalTimeSeconds = 0;
         totalFilamentMM = 0;
         updateStatsUI();
         
+        // document.getElementById('emptyState').style.display = 'flex'; // Don't show empty state content
         nozzleMesh.position.set(0,0,0);
         lastValidPolygon = null;
         baseGenerated = false;
@@ -935,28 +1020,42 @@
         if(gcodeMoves.length === 0) return alert("No model generated yet.");
         
         let dxfContent = [];
+        
+        // DXF Header
         dxfContent.push("  0", "SECTION", "  2", "HEADER", "  9", "$ACADVER", "  1", "AC1009", "  0", "ENDSEC");
+        
+        // Entities Section
         dxfContent.push("  0", "SECTION", "  2", "ENTITIES");
         
         let lastPos = {x:0, y:0, z:0};
         
         for (let i = 0; i < gcodeMoves.length; i++) {
             let m = gcodeMoves[i];
+            
+            // Only draw lines for G1 (Extrusion) moves
             if (m.type === 'G1') {
                 dxfContent.push("  0", "LINE");
-                dxfContent.push("  8", "0"); 
+                dxfContent.push("  8", "0"); // Layer 0
+                
+                // Start Point (Previous Position)
                 dxfContent.push(" 10", lastPos.x.toFixed(4));
                 dxfContent.push(" 20", lastPos.y.toFixed(4));
                 dxfContent.push(" 30", lastPos.z.toFixed(4));
+                
+                // End Point (Current Position)
                 dxfContent.push(" 11", m.x.toFixed(4));
                 dxfContent.push(" 21", m.y.toFixed(4));
                 dxfContent.push(" 31", m.z.toFixed(4));
             }
+            
+            // Update position for next iteration
             lastPos = {x: m.x, y: m.y, z: m.z};
         }
         
+        // Footer
         dxfContent.push("  0", "ENDSEC", "  0", "EOF");
         
+        // Create Blob and Download
         const blob = new Blob([dxfContent.join('\r\n')], {type: "application/dxf"});
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -1001,24 +1100,37 @@
         const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
         const flowRatio = parseFloat(document.getElementById('flowRatio').value) || 1.0;
         
+        // --- NEW EXTRUSION CALCULATION ---
+        // INCREASED LINE WIDTH MULTIPLIER: 1.125 -> 1.25
+        // This creates wider lines for better adhesion
         const lineWidth = nozzle * 1.25;
+        
+        // Area of filament cross section (pi * r^2)
         const filamentArea = Math.PI * Math.pow(filDia / 2, 2);
+        // Volumetric flow requirement per mm of movement
+        // Volume = width * height * 1mm
+        // E-step = Volume / filamentArea
+        // Added Flow Ratio multiplier
         const ePerMM = ((lineWidth * layerH) / filamentArea) * flowRatio;
         
         let e = 0;
         let lastPos = {x:0, y:0};
         
-        const retractDist = 4.0;
-        const retractSpeed = 2400;
+        // Retraction Settings
+        const retractDist = 4.0; // mm
+        const retractSpeed = 2400; // mm/min
         const printSpeed = parseFloat(document.getElementById('printSpeed').value) || 1800; 
 
         gcodeMoves.forEach((m, index) => {
             if(m.type === 'G0') {
+                // --- SMART RETRACTION LOGIC ---
                 if (index > 0) {
                     txt.push(`; Retract`);
                     txt.push(`G1 F${retractSpeed} E${(e - retractDist).toFixed(5)}`);
                 }
+
                 txt.push(`G0 F3000 X${m.x.toFixed(3)} Y${m.y.toFixed(3)} Z${m.z.toFixed(3)}`);
+
                 if (index > 0) {
                     txt.push(`; Un-retract`);
                     txt.push(`G1 F${retractSpeed} E${e.toFixed(5)}`);
@@ -1031,6 +1143,7 @@
             lastPos = {x:m.x, y:m.y};
         });
         
+        // Add Custom End G-Code
         txt.push(
             "",
             ";--END GCODE--",
