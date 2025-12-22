@@ -1,1304 +1,1307 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>G-Code Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- OpenCV.js -->
-    <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
-    <!-- Three.js & OrbitControls -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
-    
-    <style>
-        /* Dark Mode Global */
-        body { font-family: 'Roboto', sans-serif; background-color: #000000; color: #e8eaed; overflow: hidden; }
-        h1, h2, h3, button { font-family: 'Google Sans', sans-serif; }
-        
-        /* Dark Material Card */
-        .card { background: #202124; border: 1px solid #3c4043; border-radius: 12px; }
-        
-        /* Custom Scrollbar Dark */
-        ::-webkit-scrollbar { width: 8px; height: 8px; background: #000; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #5f6368; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #80868b; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G-Code Generator - Smart Scan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Dark Mode Global */
+        body { font-family: 'Roboto', sans-serif; background-color: #000000; color: #e8eaed; overflow: hidden; }
+        h1, h2, h3, button { font-family: 'Google Sans', sans-serif; }
+        
+        /* Dark Material Card */
+        .card { background: #202124; border: 1px solid #3c4043; border-radius: 12px; }
+        
+        /* Custom Scrollbar Dark */
+        ::-webkit-scrollbar { width: 8px; height: 8px; background: #000; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #5f6368; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #80868b; }
 
-        /* Canvas Styles */
-        #videoInput { display: none; }
-        canvas.vision-canvas { width: 100%; height: auto; border-radius: 8px; background: #000; border: 1px solid #3c4043; }
-        
-        /* Dark Range Slider */
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #8ab4f8; margin-top: -6px; cursor: pointer; border: 2px solid #202124; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #5f6368; border-radius: 2px; }
-        
-        /* Inputs Dark */
-        input[type=number] { background-color: #303134; color: #e8eaed; border: 1px solid #5f6368; }
-        input[type=number]:focus { border-color: #8ab4f8; outline: none; }
-        
-        /* Select Dark */
-        select { background-color: #303134; color: #e8eaed; border: 1px solid #5f6368; border-radius: 4px; padding: 2px 4px; font-size: 0.875rem; }
-        
-        /* Checkbox */
-        input[type="checkbox"] { accent-color: #8ab4f8; }
+        /* Canvas Styles */
+        #videoInput { display: none; }
+        canvas.vision-canvas { width: 100%; height: auto; border-radius: 8px; background: #000; border: 1px solid #3c4043; }
+        
+        /* Dark Range Slider */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #8ab4f8; margin-top: -6px; cursor: pointer; border: 2px solid #202124; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #5f6368; border-radius: 2px; }
+        
+        /* Inputs Dark */
+        input[type=number] { background-color: #303134; color: #e8eaed; border: 1px solid #5f6368; }
+        input[type=number]:focus { border-color: #8ab4f8; outline: none; }
+        
+        /* Select Dark */
+        select { background-color: #303134; color: #e8eaed; border: 1px solid #5f6368; border-radius: 4px; padding: 2px 4px; font-size: 0.875rem; }
+        
+        /* Checkbox */
+        input[type="checkbox"] { accent-color: #8ab4f8; }
 
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; display: flex; justify-content: center; align-items: center; z-index: 100; flex-direction: column; }
-        
-        #canvas3d { width: 100%; height: 100%; display: block; outline: none; }
-        
-        /* Pulse animation for recording (Dark mode red) */
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(242, 139, 130, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0); }
-        }
-        .recording-pulse { animation: pulse-red 2s infinite; }
-    </style>
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; display: flex; justify-content: center; align-items: center; z-index: 100; flex-direction: column; }
+        
+        #canvas3d { width: 100%; height: 100%; display: block; outline: none; }
+        
+        /* Pulse animation for recording (Dark mode red) */
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(242, 139, 130, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0); }
+        }
+        @keyframes pulse-yellow {
+            0% { box-shadow: 0 0 0 0 rgba(253, 214, 99, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(253, 214, 99, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(253, 214, 99, 0); }
+        }
+        .recording-pulse { animation: pulse-red 2s infinite; }
+    </style>
 </head>
 <body class="h-screen flex flex-col">
 
-    <!-- Loading Screen -->
-    <div id="loading" class="loading-overlay">
-        <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div class="text-xl font-medium text-gray-300">Vision Engine Initializing...</div>
-    </div>
+    <!-- Loading Screen -->
+    <div id="loading" class="loading-overlay">
+        <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div class="text-xl font-medium text-gray-300">Vision Engine Initializing...</div>
+    </div>
 
-    <!-- Hidden File Input for Video Upload -->
-    <input type="file" id="videoUploadInput" accept="video/*" class="hidden" onchange="handleVideoUpload(this)">
+    <!-- Hidden File Input for Video Upload -->
+    <input type="file" id="videoUploadInput" accept="video/*" class="hidden" onchange="handleVideoUpload(this)">
 
-    <!-- Header -->
-    <header class="bg-black border-b border-gray-800 h-16 flex items-center justify-between px-6 shrink-0 z-10">
-        <div class="flex items-center gap-3">
-            <h1 class="text-xl font-medium text-gray-200">G-code Generator <span class="text-xs text-gray-500 ml-2 font-mono">BETA</span></h1>
-        </div>
-        <div class="flex gap-3">
-            <!-- Source Controls -->
-            <button id="startCamBtn" class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                Camera
-            </button>
-            <button onclick="document.getElementById('videoUploadInput').click()" class="border border-gray-600 hover:border-gray-400 text-gray-300 hover:text-white px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                Upload Video
-            </button>
-            
-            <div class="w-px h-6 bg-gray-700 mx-2 self-center"></div>
+    <!-- Header -->
+    <header class="bg-black border-b border-gray-800 h-16 flex items-center justify-between px-6 shrink-0 z-10">
+        <div class="flex items-center gap-3">
+            <h1 class="text-xl font-medium text-gray-200">G-code Generator <span class="text-xs text-gray-500 ml-2 font-mono">SMART-SCAN</span></h1>
+        </div>
+        <div class="flex gap-3">
+            <!-- Source Controls -->
+            <button id="startCamBtn" class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                Camera
+            </button>
+            <button onclick="document.getElementById('videoUploadInput').click()" class="border border-gray-600 hover:border-gray-400 text-gray-300 hover:text-white px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Upload Video
+            </button>
+            
+            <div class="w-px h-6 bg-gray-700 mx-2 self-center"></div>
 
-            <!-- Action Controls -->
-            <button onclick="resetApp()" class="text-gray-400 hover:text-white px-3 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            </button>
-            <button onclick="exportDxf()" class="bg-[#303134] border border-gray-600 hover:bg-[#3c4043] text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                Export DXF
-            </button>
-            <button onclick="exportGcode()" class="bg-[#303134] border border-gray-600 hover:bg-[#3c4043] text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Export
-            </button>
-        </div>
-    </header>
+            <!-- Action Controls -->
+            <button onclick="resetApp()" class="text-gray-400 hover:text-white px-3 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
+            <button onclick="exportDxf()" class="bg-[#303134] border border-gray-600 hover:bg-[#3c4043] text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                Export DXF
+            </button>
+            <button onclick="exportGcode()" class="bg-[#303134] border border-gray-600 hover:bg-[#3c4043] text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Export
+            </button>
+        </div>
+    </header>
 
-    <!-- Main Layout -->
-    <div class="flex flex-1 overflow-hidden">
-        
-        <!-- Left Sidebar: Vision & Settings -->
-        <aside class="w-80 bg-black border-r border-gray-800 flex flex-col overflow-y-auto z-10">
-            <div class="p-5 space-y-6">
-                
-                <!-- Vision Preview Card -->
-                <div class="card p-4 space-y-3">
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Source Feed</h3>
-                        <span class="text-[10px] text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded" id="statusBadge">IDLE</span>
-                    </div>
-                    <div class="relative aspect-video bg-black rounded border border-gray-700 overflow-hidden group">
-                        <video id="videoInput" class="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" muted playsinline></video>
-                        <canvas id="canvasOutput" class="vision-canvas relative z-10"></canvas>
-                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" id="camPlaceholder">
-                            <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mb-2">
-                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                            </div>
-                            <span class="text-gray-600 text-xs font-mono">NO SIGNAL</span>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-4 pt-2">
-                        <!-- Mode Select -->
-                        <div>
-                             <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
-                                <span>GENERATION MODE</span>
-                            </div>
-                            <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded p-2 text-sm focus:border-[#8ab4f8] outline-none">
-                                <option value="CYLINDER">Cylinder Texture (Vase)</option>
-                                <option value="SHAPE">Shape Scan (Legacy)</option>
-                            </select>
-                        </div>
+    <!-- Main Layout -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Left Sidebar: Vision & Settings -->
+        <aside class="w-80 bg-black border-r border-gray-800 flex flex-col overflow-y-auto z-10">
+            <div class="p-5 space-y-6">
+                
+                <!-- Vision Preview Card -->
+                <div class="card p-4 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Source Feed</h3>
+                        <span class="text-[10px] text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded" id="statusBadge">IDLE</span>
+                    </div>
+                    <div class="relative aspect-video bg-black rounded border border-gray-700 overflow-hidden group">
+                        <video id="videoInput" class="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" muted playsinline></video>
+                        <canvas id="canvasOutput" class="vision-canvas relative z-10"></canvas>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" id="camPlaceholder">
+                            <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mb-2">
+                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </div>
+                            <span class="text-gray-600 text-xs font-mono">NO SIGNAL</span>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4 pt-2">
+                        <!-- Mode Select -->
+                        <div>
+                             <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
+                                <span>GENERATION MODE</span>
+                            </div>
+                            <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded p-2 text-sm focus:border-[#8ab4f8] outline-none">
+                                <option value="SHAPE" selected>Shape Scan (Precise)</option>
+                                <option value="CYLINDER">Cylinder Texture (Vase)</option>
+                            </select>
+                        </div>
 
-                        <div>
-                            <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
-                                <span>TEXTURE INTENSITY</span>
-                                <span id="val-tex" class="text-gray-300">5.0</span>
-                            </div>
-                            <input type="range" id="textureDepth" min="0" max="10" step="0.1" value="5.0">
-                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
+                                <span>TEXTURE INTENSITY (VASE)</span>
+                                <span id="val-tex" class="text-gray-300">5.0</span>
+                            </div>
+                            <input type="range" id="textureDepth" min="0" max="10" step="0.1" value="5.0">
+                        </div>
 
-                        <div class="border-t border-gray-700 pt-4">
-                            <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
-                                <span>CANNY THRESHOLD</span>
-                            </div>
-                            <div class="space-y-2">
-                                <input type="range" id="threshold1" min="0" max="255" value="50">
-                                <input type="range" id="threshold2" min="0" max="255" value="150">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Main Action Button -->
-                    <button id="toggleScanBtn" class="w-full bg-[#303134] text-[#8ab4f8] hover:bg-[#3c4043] border border-gray-600 py-3 rounded-lg text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed flex justify-center items-center gap-2" disabled>
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>START BUILD</span>
-                    </button>
-                </div>
+                        <div class="border-t border-gray-700 pt-4">
+                            <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
+                                <span>CANNY THRESHOLD</span>
+                            </div>
+                            <div class="space-y-2">
+                                <input type="range" id="threshold1" min="0" max="255" value="50">
+                                <input type="range" id="threshold2" min="0" max="255" value="150">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Main Action Button -->
+                    <button id="toggleScanBtn" class="w-full bg-[#303134] text-[#8ab4f8] hover:bg-[#3c4043] border border-gray-600 py-3 rounded-lg text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed flex justify-center items-center gap-2" disabled>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>START BUILD</span>
+                    </button>
+                </div>
 
-                <!-- Print Settings Card -->
-                <div class="card p-4 space-y-4">
-                    <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                        <div class="flex items-center gap-2">
-                            <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Parameters</h3>
-                            <button onclick="fitView()" class="text-[#8ab4f8] hover:text-white p-1 rounded hover:bg-gray-700" title="Fit View">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18M3 21h18M12 8v8m-4-4h8"></path></svg>
-                            </button>
-                        </div>
-                        <div class="flex gap-3">
-                            <label class="flex items-center gap-1.5 text-[10px] text-gray-300 cursor-pointer select-none">
-                                <input type="checkbox" id="genBase" checked class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
-                                Gen Base
-                            </label>
-                            <label class="flex items-center gap-1.5 text-[10px] text-gray-400 cursor-pointer select-none">
-                                <input type="checkbox" id="showBounds" checked onchange="toggleBoundingBox()" class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
-                                Box
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-mono">Bed/Box Width (mm)</label>
-                            <input type="number" id="targetWidth" value="240" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-mono">Max H (mm)</label>
-                            <input type="number" id="modelHeight" value="240.0" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-mono">Layer (mm)</label>
-                            <input type="number" id="layerHeight" value="0.2" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-mono">Nozzle (mm)</label>
-                            <select id="nozzleDia" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] outline-none">
-                                <option value="0.2">0.2 mm</option>
-                                <option value="0.4" selected>0.4 mm</option>
-                                <option value="0.6">0.6 mm</option>
-                                <option value="0.8">0.8 mm</option>
-                            </select>
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-mono">Filament (mm)</label>
-                            <input type="number" id="filDia" value="1.75" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-mono">Flow Ratio</label>
-                            <input type="number" id="flowRatio" value="1.5" step="0.1" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-mono">Print Speed (F)</label>
-                            <input type="number" id="printSpeed" value="1200" step="100" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-[10px] text-gray-500 uppercase font-mono">Scan Delay (ms)</label>
-                            <input type="number" id="scanSpeed" value="100" step="10" min="20" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
-                        </div>
-                    </div>
-                </div>
+                <!-- Print Settings Card -->
+                <div class="card p-4 space-y-4">
+                    <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Parameters</h3>
+                            <button onclick="fitView()" class="text-[#8ab4f8] hover:text-white p-1 rounded hover:bg-gray-700" title="Fit View">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18M3 21h18M12 8v8m-4-4h8"></path></svg>
+                            </button>
+                        </div>
+                        <div class="flex gap-3">
+                            <label class="flex items-center gap-1.5 text-[10px] text-gray-300 cursor-pointer select-none">
+                                <input type="checkbox" id="genBase" checked class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
+                                Gen Base
+                            </label>
+                            <label class="flex items-center gap-1.5 text-[10px] text-gray-400 cursor-pointer select-none">
+                                <input type="checkbox" id="showBounds" checked onchange="toggleBoundingBox()" class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
+                                Box
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Bed/Box Width (mm)</label>
+                            <input type="number" id="targetWidth" value="240" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Max H (mm)</label>
+                            <input type="number" id="modelHeight" value="240.0" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Layer (mm)</label>
+                            <input type="number" id="layerHeight" value="0.2" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Nozzle (mm)</label>
+                            <select id="nozzleDia" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] outline-none">
+                                <option value="0.2">0.2 mm</option>
+                                <option value="0.4" selected>0.4 mm</option>
+                                <option value="0.6">0.6 mm</option>
+                                <option value="0.8">0.8 mm</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Filament (mm)</label>
+                            <input type="number" id="filDia" value="1.75" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Flow Ratio</label>
+                            <input type="number" id="flowRatio" value="1.5" step="0.1" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Print Speed (F)</label>
+                            <input type="number" id="printSpeed" value="1200" step="100" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-mono">Scan Delay (ms)</label>
+                            <input type="number" id="scanSpeed" value="100" step="10" min="20" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
+                        </div>
+                    </div>
+                </div>
 
-            </div>
-        </aside>
+            </div>
+        </aside>
 
-        <!-- Right: 3D Visualization -->
-        <main class="flex-1 relative bg-black">
-            <div id="canvas3d-container" class="absolute inset-0"></div>
-            
-            <!-- Live Status Overlay -->
-            <div id="liveStatus" class="absolute top-6 left-1/2 transform -translate-x-1/2 bg-[#202124]/90 backdrop-blur rounded-full border border-gray-700 px-6 py-2 flex items-center gap-4 hidden z-20">
-                <div class="flex items-center gap-2">
-                    <div class="w-1.5 h-1.5 rounded-full bg-[#f28b82] animate-pulse"></div>
-                    <span class="text-xs font-bold text-gray-300 tracking-wide">BUILDING</span>
-                </div>
-                <div class="h-3 w-px bg-gray-600"></div>
-                <div class="text-[10px] text-gray-400 font-mono flex gap-3">
-                    <span>Z: <span id="currentZDisplay" class="text-white">0.00</span></span>
-                    <span>L: <span id="currentLayerDisplay" class="text-white">0</span></span>
-                </div>
-                <div class="h-3 w-px bg-gray-600"></div>
-                <div class="text-[10px] text-gray-400 font-mono">
-                    Time: <span id="estTimeDisplay" class="text-[#8ab4f8]">00:00</span>
-                </div>
-                <div class="h-3 w-px bg-gray-600"></div>
-                <div class="text-[10px] text-gray-400 font-mono">
-                    Filament: <span id="estFilamentDisplay" class="text-[#8ab4f8]">0m / 0g</span>
-                </div>
-            </div>
-            
-            <!-- Empty State (CLEARED CONTENT) -->
-            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
-            </div>
-        </main>
-    </div>
+        <!-- Right: 3D Visualization -->
+        <main class="flex-1 relative bg-black">
+            <div id="canvas3d-container" class="absolute inset-0"></div>
+            
+            <!-- Live Status Overlay -->
+            <div id="liveStatus" class="absolute top-6 left-1/2 transform -translate-x-1/2 bg-[#202124]/90 backdrop-blur rounded-full border border-gray-700 px-6 py-2 flex items-center gap-4 hidden z-20">
+                <div class="flex items-center gap-2">
+                    <div id="statusDot" class="w-2 h-2 rounded-full bg-[#f28b82]"></div>
+                    <span id="statusText" class="text-xs font-bold text-gray-300 tracking-wide">BUILDING</span>
+                </div>
+                <div class="h-3 w-px bg-gray-600"></div>
+                <div class="text-[10px] text-gray-400 font-mono flex gap-3">
+                    <span>Z: <span id="currentZDisplay" class="text-white">0.00</span></span>
+                    <span>L: <span id="currentLayerDisplay" class="text-white">0</span></span>
+                </div>
+                <div class="h-3 w-px bg-gray-600"></div>
+                <div class="text-[10px] text-gray-400 font-mono">
+                    Time: <span id="estTimeDisplay" class="text-[#8ab4f8]">00:00</span>
+                </div>
+                <div class="h-3 w-px bg-gray-600"></div>
+                <div class="text-[10px] text-gray-400 font-mono">
+                    Filament: <span id="estFilamentDisplay" class="text-[#8ab4f8]">0m / 0g</span>
+                </div>
+            </div>
+            
+            <!-- Empty State (CLEARED CONTENT) -->
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
+            </div>
+        </main>
+    </div>
 
 <script>
-    // --- Global Variables ---
-    let stream = null;
-    let cvReady = false;
-    let video = document.getElementById('videoInput');
-    let startBtn = document.getElementById('startCamBtn');
-    let toggleScanBtn = document.getElementById('toggleScanBtn');
-    let streaming = false;
-    let isVideoFile = false;
-
-    // Scanning State
-    let isScanning = false;
-    let scanIntervalId = null;
-    let currentZ = 0;
-    let currentLayer = 0;
-    let consecutiveEmptyLayers = 0; 
-    const EMPTY_LAYER_THRESHOLD = 50; 
-    let gcodeMoves = []; 
-    let lastValidPolygon = null; 
-    let baseGenerated = false; // Flag to track if base has been generated
-    
-    // Estimates
-    let totalTimeSeconds = 0;
-    let totalFilamentMM = 0;
-    
-    // Three.js Dynamic Geometry Buffers
-    const MAX_POINTS = 1000000;
-    let linePositions, lineColors;
-    let drawCount = 0;
-
-    // OpenCV objects
-    let src = null, dst = null, cap = null, contours = null, hierarchy = null;
-
-    // Three.js objects
-    let scene, camera, renderer, controls;
-    let livePrintMesh; 
-    let nozzleMesh;
-    let boundsBox; // Bounding box helper
-    let gridHelper; // Global grid
-    
-    // UI Elements
-    const sliderT1 = document.getElementById('threshold1');
-    const sliderT2 = document.getElementById('threshold2');
-    const sliderTex = document.getElementById('textureDepth');
-    const modeSelect = document.getElementById('generationMode');
-    
-    const labelTex = document.getElementById('val-tex');
-    const statusBadge = document.getElementById('statusBadge');
-    const camPlaceholder = document.getElementById('camPlaceholder');
-    const liveStatus = document.getElementById('liveStatus');
-    const zDisplay = document.getElementById('currentZDisplay');
-    const layerDisplay = document.getElementById('currentLayerDisplay');
-    const gcodeCountDisplay = document.getElementById('gcodeCountDisplay'); // Removed, replaced by Time/Filament
-    const estTimeDisplay = document.getElementById('estTimeDisplay');
-    const estFilamentDisplay = document.getElementById('estFilamentDisplay');
-
-    // --- Initialization ---
-
-    function onOpenCvReady() {
-        console.log('OpenCV Ready');
-        document.getElementById('loading').style.display = 'none';
-        cvReady = true;
-        startBtn.disabled = false;
-        initThreeJS();
-    }
-
-    sliderTex.oninput = () => labelTex.innerText = sliderTex.value;
-
-    // --- Vision Logic ---
-
-    startBtn.addEventListener('click', () => {
-        if (streaming && !isVideoFile) {
-            stopInput();
-        } else {
-            stopInput();
-            startCamera();
-        }
-    });
-
-    window.handleVideoUpload = function(input) {
-        if (input.files && input.files[0]) {
-            stopInput();
-            const file = input.files[0];
-            const url = URL.createObjectURL(file);
-            video.src = url;
-            video.loop = false; 
-            
-            streaming = true;
-            isVideoFile = true;
-            
-            enableUI(true);
-            statusBadge.innerText = "VIDEO";
-            
-            video.oncanplay = function() {
-                video.oncanplay = null; 
-                setTimeout(() => {
-                    if(!streaming) return;
-                    initCvObjects();
-                    startScanning();
-                }, 500); 
-            };
-            
-            video.onended = function() {
-                if(isScanning) stopScanning();
-            };
-
-            video.play().catch(e => console.error("Video play failed:", e));
-        }
-        input.value = '';
-    }
-
-    function startCamera() {
-        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-            .then(function(s) {
-                stream = s;
-                video.srcObject = stream;
-                video.play();
-                streaming = true;
-                isVideoFile = false;
-
-                enableUI(true);
-                startBtn.innerHTML = `Stop`;
-                startBtn.classList.replace('bg-[#8ab4f8]', 'bg-[#f28b82]'); 
-                startBtn.classList.replace('text-[#202124]', 'text-[#202124]');
-                startBtn.classList.replace('hover:bg-[#aecbfa]', 'hover:bg-[#f6aea9]');
-                
-                statusBadge.innerText = "LIVE";
-                statusBadge.classList.replace('text-[#8ab4f8]', 'text-[#81c995]');
-                statusBadge.classList.replace('border-[#8ab4f8]/30', 'border-[#81c995]/30');
-                
-                video.oncanplay = function() { 
-                    video.oncanplay = null;
-                    setTimeout(initCvObjects, 500); 
-                };
-            })
-            .catch(function(err) {
-                console.error("Camera Error:", err);
-                alert("无法访问摄像头。请允许权限。");
-            });
-    }
-
-    function stopInput() {
-        if(isScanning) stopScanning();
-
-        if (!streaming) return;
-        streaming = false;
-        video.pause();
-        if(stream) { stream.getTracks().forEach(track => track.stop()); stream = null; video.srcObject = null; }
-        if(video.src) { URL.revokeObjectURL(video.src); video.src = ""; }
-        
-        // SAFE CLEANUP
-        if(src) { try{src.delete();}catch(e){} src = null; }
-        if(dst) { try{dst.delete();}catch(e){} dst = null; }
-        if(contours) { try{contours.delete();}catch(e){} contours = null; }
-        if(hierarchy) { try{hierarchy.delete();}catch(e){} hierarchy = null; }
-        if(cap) { try{if(typeof cap.delete === 'function') cap.delete();}catch(e){} cap = null; }
-        
-        let ctx = document.getElementById('canvasOutput').getContext('2d');
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        
-        enableUI(false);
-        startBtn.innerHTML = `Camera`;
-        startBtn.className = "bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2";
-        
-        statusBadge.innerText = "IDLE";
-        statusBadge.className = "text-[10px] text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded";
-    }
-
-    function enableUI(enabled) {
-        toggleScanBtn.disabled = !enabled;
-        camPlaceholder.style.display = enabled ? 'none' : 'flex';
-    }
-
-    function initCvObjects() {
-        if(!streaming) return;
-        let width = video.videoWidth;
-        let height = video.videoHeight;
-        video.width = width;
-        video.height = height;
-        let canvas = document.getElementById('canvasOutput');
-        canvas.width = width;
-        canvas.height = height;
-
-        src = new cv.Mat(height, width, cv.CV_8UC4);
-        dst = new cv.Mat(height, width, cv.CV_8UC1);
-        contours = new cv.MatVector();
-        hierarchy = new cv.Mat();
-        cap = new cv.VideoCapture(video);
-
-        requestAnimationFrame(processVideoFrame);
-    }
-
-    function processVideoFrame() {
-        if (!streaming) return;
-        try {
-            if(!cap) return;
-            cap.read(src);
-            cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
-            cv.GaussianBlur(dst, dst, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
-            cv.Canny(dst, dst, parseInt(sliderT1.value), parseInt(sliderT2.value), 3, false);
-            cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-            let minArea = 100;
-            for (let i = 0; i < contours.size(); ++i) {
-                let cnt = contours.get(i);
-                if(cnt) {
-                    if (cv.contourArea(cnt) > minArea) {
-                        cv.drawContours(src, contours, i, new cv.Scalar(138, 180, 248, 255), 2, cv.LINE_8, hierarchy, 0); // #8ab4f8
-                    }
-                    cnt.delete(); 
-                }
-            }
-            cv.imshow('canvasOutput', src);
-        } catch (e) { console.log("Stream ended/Error in loop"); }
-        requestAnimationFrame(processVideoFrame);
-    }
-
-    // --- Live Scanning / Printing Logic ---
-
-    toggleScanBtn.addEventListener('click', () => {
-        if(isScanning) stopScanning();
-        else startScanning();
-    });
-
-    function startScanning() {
-        if(!streaming) return alert("Please start camera source first.");
-        
-        // --- VIDEO REPLAY & RESET ---
-        if(isVideoFile) {
-            if (video.paused || video.ended) {
-                video.currentTime = 0;
-                video.play();
-                // Reset logic handled below
-            }
-        }
-        
-        // Reset State
-        isScanning = true;
-        baseGenerated = false; // Reset base generation flag
-        consecutiveEmptyLayers = 0;
-        lastValidPolygon = null;
-        gcodeMoves = [];
-        drawCount = 0;
-        totalTimeSeconds = 0;
-        totalFilamentMM = 0;
-        currentZ = 0;
-        currentLayer = 0;
-        
-        if(livePrintMesh) livePrintMesh.geometry.setDrawRange(0, 0);
-        zDisplay.innerText = "0.00";
-        layerDisplay.innerText = "0";
-        updateStatsUI();
-        nozzleMesh.position.set(0,0,0);
-
-        // DO NOT call generateBaseLayers here. It will be called inside processOneLayer when valid shape found.
-
-        toggleScanBtn.innerHTML = `<span>STOP BUILD</span>`;
-        toggleScanBtn.classList.add('border-[#f28b82]', 'text-[#f28b82]');
-        toggleScanBtn.classList.remove('border-gray-600', 'text-[#8ab4f8]');
-        
-        liveStatus.style.display = 'flex';
-        document.getElementById('emptyState').style.display = 'none';
-
-        let speed = parseInt(document.getElementById('scanSpeed').value);
-        scanIntervalId = setInterval(processOneLayer, speed);
-    }
-
-    // NEW: Generate Base from a polygon shape using SCANLINE fill (0 and 90 degrees)
-    function generateBaseFromPoly(polygon) {
-        const bedSize = parseFloat(document.getElementById('targetWidth').value);
-        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
-        const layerH = parseFloat(document.getElementById('layerHeight').value);
-        const baseLayers = 3; 
-        
-        const spacing = nozzle * 1.25; // Line spacing for fill
-        
-        // Get bounding box of polygon for scanning
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        polygon.forEach(p => {
-            if(p.x < minX) minX = p.x; if(p.x > maxX) maxX = p.x;
-            if(p.y < minY) minY = p.y; if(p.y > maxY) maxY = p.y;
-        });
-
-        console.log("Generating Rectilinear Base from Shape...");
-        let baseMoves = [];
-
-        // --- Helper: Intersect Scanline ---
-        // Returns list of intersection points (x for horizontal scan, y for vertical)
-        function getIntersections(val, isHorizontal) {
-            let intersections = [];
-            for (let i = 0; i < polygon.length; i++) {
-                let p1 = polygon[i];
-                let p2 = polygon[(i + 1) % polygon.length];
-                
-                let v1 = isHorizontal ? p1.y : p1.x;
-                let v2 = isHorizontal ? p2.y : p2.x;
-                
-                // Check if scanline crosses edge
-                if (((v1 <= val) && (v2 > val)) || ((v1 > val) && (v2 <= val))) {
-                    // Calc intersect
-                    let t = (val - v1) / (v2 - v1);
-                    let intVal = isHorizontal 
-                        ? p1.x + t * (p2.x - p1.x)
-                        : p1.y + t * (p2.y - p1.y);
-                    intersections.push(intVal);
-                }
-            }
-            return intersections.sort((a, b) => a - b);
-        }
-
-        // --- Generate Layers ---
-        for(let l=1; l<=baseLayers; l++) {
-            let z = l * layerH;
-            
-            // 1. Draw Perimeters (2 shells)
-            // Simulating shells by drawing polygon twice. 
-            // Note: Simple repetition without offset isn't ideal but fits constraints.
-            // First loop (Outer)
-            if(polygon.length > 0) {
-                // Travel to start
-                baseMoves.push({ type: 'G0', x: polygon[0].x, y: polygon[0].y, z: z });
-                // Extrude Loop
-                for(let i=1; i<polygon.length; i++) {
-                    baseMoves.push({ type: 'G1', x: polygon[i].x, y: polygon[i].y, z: z });
-                    add3DLine(polygon[i-1], polygon[i], true, 'base');
-                }
-                // Close
-                baseMoves.push({ type: 'G1', x: polygon[0].x, y: polygon[0].y, z: z });
-                add3DLine(polygon[polygon.length-1], polygon[0], true, 'base');
-                
-                // Second loop (Inner - approximation: same path, maybe slight offset logic could go here)
-                // Just repeating for wall strength in this simplified context
-                // ... skipped for now to avoid messiness, single shell + infill is safer
-            }
-
-            // 2. Generate Infill
-            // Layer 1 & 3: Horizontal (0 deg)
-            // Layer 2: Vertical (90 deg)
-            let isHorizontal = (l % 2 !== 0); 
-            
-            let startVal = isHorizontal ? minY : minX;
-            let endVal = isHorizontal ? maxY : maxX;
-            
-            // Inset slightly to not overlap perimeter
-            startVal += spacing;
-            endVal -= spacing;
-
-            for (let val = startVal; val <= endVal; val += spacing) {
-                let intersects = getIntersections(val, isHorizontal);
-                
-                // Draw segments between pairs
-                for (let i = 0; i < intersects.length - 1; i += 2) {
-                    let pStart, pEnd;
-                    
-                    if (isHorizontal) {
-                        pStart = { x: intersects[i], y: val };
-                        pEnd = { x: intersects[i+1], y: val };
-                    } else {
-                        pStart = { x: val, y: intersects[i] };
-                        pEnd = { x: val, y: intersects[i+1] };
-                    }
-                    
-                    // Optimization: Travel to closest point
-                    // Here simple logic: Travel to Start, Extrude to End
-                    baseMoves.push({ type: 'G0', x: pStart.x, y: pStart.y, z: z });
-                    baseMoves.push({ type: 'G1', x: pEnd.x, y: pEnd.y, z: z });
-                    add3DLine(pStart, pEnd, true, 'base');
-                }
-            }
-            
-            currentZ = z;
-            currentLayer = l;
-        }
-        
-        gcodeMoves.push(...baseMoves);
-        updateEstimates(baseMoves);
-        zDisplay.innerText = currentZ.toFixed(2);
-        layerDisplay.innerText = currentLayer;
-        
-        // Prepare Z for next live layer (Layer 4)
-        currentZ += layerH;
-    }
-
-    function stopScanning() {
-        isScanning = false;
-        clearInterval(scanIntervalId);
-        
-        if(isVideoFile && streaming && !video.ended) {
-             video.pause();
-        }
-        
-        toggleScanBtn.innerHTML = `<span>START BUILD</span>`;
-        toggleScanBtn.classList.remove('border-[#f28b82]', 'text-[#f28b82]');
-        toggleScanBtn.classList.add('border-gray-600', 'text-[#8ab4f8]');
-        
-        setTimeout(() => liveStatus.style.display = 'none', 1000);
-    }
-
-    function updateEstimates(newMoves) {
-        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
-        const layerH = parseFloat(document.getElementById('layerHeight').value); 
-        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
-        const flowRatio = parseFloat(document.getElementById('flowRatio').value) || 1.0;
-        const printSpeedMin = parseFloat(document.getElementById('printSpeed').value) || 1800; 
-        const printSpeedSec = printSpeedMin / 60; 
-        
-        const travelSpeedMin = 3000; 
-        const travelSpeedSec = travelSpeedMin / 60;
-        
-        const retractDist = 4.0;
-        const retractSpeedMin = 2400;
-        const retractTime = (retractDist / (retractSpeedMin / 60)) * 2; 
-
-        const lineWidth = nozzle * 1.25;
-        const filamentArea = Math.PI * Math.pow(filDia / 2, 2);
-        const ePerMM = ((lineWidth * layerH) / filamentArea) * flowRatio;
-
-        let lastPos = null;
-        if(gcodeMoves.length > newMoves.length) {
-             let prevMove = gcodeMoves[gcodeMoves.length - newMoves.length - 1];
-             lastPos = { x: prevMove.x, y: prevMove.y, z: prevMove.z };
-        } else {
-             lastPos = { x: 0, y: 0, z: 0 };
-        }
-
-        newMoves.forEach(m => {
-            let dist = Math.hypot(m.x - lastPos.x, m.y - lastPos.y);
-            
-            if(m.type === 'G0') {
-                totalTimeSeconds += (dist / travelSpeedSec);
-                if(dist > 2.0) totalTimeSeconds += retractTime;
-            } else {
-                totalTimeSeconds += (dist / printSpeedSec);
-                totalFilamentMM += (dist * ePerMM);
-            }
-            lastPos = { x: m.x, y: m.y, z: m.z };
-        });
-        
-        updateStatsUI();
-    }
-
-    function updateStatsUI() {
-        let h = Math.floor(totalTimeSeconds / 3600);
-        let m = Math.floor((totalTimeSeconds % 3600) / 60);
-        let s = Math.floor(totalTimeSeconds % 60);
-        
-        let timeStr = "";
-        if(h > 0) timeStr += `${h}h `;
-        timeStr += `${m}m ${s}s`;
-        estTimeDisplay.innerText = timeStr;
-
-        let meters = (totalFilamentMM / 1000).toFixed(2);
-        
-        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
-        const area = Math.PI * Math.pow(filDia/2, 2);
-        const volumeCM3 = (totalFilamentMM * area) / 1000;
-        const weight = (volumeCM3 * 1.24).toFixed(1);
-        
-        estFilamentDisplay.innerText = `${meters}m / ${weight}g`;
-    }
-
-    function processOneLayer() {
-        if(!isScanning || !contours) return;
-
-        const maxH = parseFloat(document.getElementById('modelHeight').value);
-        const layerH = parseFloat(document.getElementById('layerHeight').value);
-        const bedSize = parseFloat(document.getElementById('targetWidth').value); 
-        const mode = modeSelect.value;
-        const textureFactor = parseFloat(sliderTex.value);
-
-        if (currentZ === 0) currentZ = layerH;
-
-        if (currentZ > maxH) {
-            stopScanning();
-            return;
-        }
-
-        let layerPoints = [];
-
-        // --- MODE 1: CYLINDER TEXTURE (VASE) ---
-        if (mode === 'CYLINDER') {
-            const numSegments = 72; 
-            const maxRadius = bedSize / 2; 
-            const safetyMargin = 10.0;
-            const absoluteMaxRadius = Math.max(5, maxRadius - safetyMargin); 
-            const baseRadius = Math.max(10, maxRadius - 50.0); 
-            const center = { x: video.width / 2, y: video.height / 2 };
-            let radii = new Array(numSegments).fill(0); 
-            
-            let totalDist = 0;
-            let activePoints = 0;
-
-            if (contours.size() > 0) {
-                 for (let i = 0; i < contours.size(); ++i) {
-                    let cnt = contours.get(i);
-                    // FIX: Ensure cnt exists and DELETE it after use
-                    if(cnt) {
-                        const data = cnt.data32S;
-                        if(data) {
-                            for (let j = 0; j < data.length; j += 2) {
-                                let px = data[j];
-                                let py = data[j+1];
-                                
-                                let dx = px - center.x;
-                                let dy = py - center.y;
-                                let dist = Math.sqrt(dx*dx + dy*dy);
-                                
-                                totalDist += dist;
-                                activePoints++;
-
-                                let angle = Math.atan2(dy, dx); 
-                                if(angle < 0) angle += Math.PI * 2;
-                                
-                                let bin = Math.floor((angle / (Math.PI * 2)) * numSegments) % numSegments;
-                                
-                                let normDist = dist / (video.width/2);
-                                if(normDist > radii[bin]) radii[bin] = normDist;
-                            }
-                        }
-                        cnt.delete(); 
-                    }
-                 }
-            }
-
-            let layerThicknessOffset = 0;
-            if (activePoints > 0) {
-                const avgDist = totalDist / activePoints;
-                const normAvg = avgDist / (video.width / 2);
-                layerThicknessOffset = normAvg * 20.0; 
-            }
-
-            for (let i = 0; i <= numSegments; i++) {
-                let idx = i % numSegments;
-                let angle = (i / numSegments) * Math.PI * 2;
-                let r = baseRadius + layerThicknessOffset + (radii[idx] * textureFactor * 5.0); 
-                
-                if (r > absoluteMaxRadius) r = absoluteMaxRadius;
-
-                let finalX = (bedSize / 2) + (Math.cos(angle) * r);
-                let finalY = (bedSize / 2) + (Math.sin(angle) * r);
-
-                layerPoints.push({ x: finalX, y: finalY });
-            }
-        } 
-        // --- MODE 2: SHAPE SCAN ---
-        else {
-             let bestPoly = null;
-             let maxArea = 0;
-
-             if(contours.size() > 0) {
-                for (let i = 0; i < contours.size(); ++i) {
-                    let cnt = contours.get(i);
-                    // FIX: Ensure cnt exists and DELETE it after use
-                    if(cnt) {
-                        let area = cv.contourArea(cnt);
-                        if (area > 100 && area > maxArea) {
-                            maxArea = area;
-                            let tempPoly = [];
-                            const data = cnt.data32S;
-                            if(data) {
-                                for (let j = 0; j < data.length; j += 2) {
-                                    tempPoly.push({ x: data[j], y: data[j+1] });
-                                }
-                            }
-                            bestPoly = tempPoly;
-                        }
-                        cnt.delete();
-                    }
-                }
-            }
-            
-            if (!bestPoly && lastValidPolygon && consecutiveEmptyLayers < EMPTY_LAYER_THRESHOLD) {
-                bestPoly = lastValidPolygon;
-            }
-
-            if (bestPoly) {
-                lastValidPolygon = bestPoly; 
-                consecutiveEmptyLayers = 0; 
-
-                let scaleFactor = bedSize / video.videoWidth; 
-                const centerX = bedSize / 2;
-                const centerY = (video.videoHeight * scaleFactor) / 2; 
-                const maxR = (bedSize / 2) - 5; 
-                
-                let transformedPoly = bestPoly.map(p => {
-                    let relX = (p.x * scaleFactor) - centerX;
-                    let relY = (p.y * scaleFactor) - centerY; 
-                    
-                    let dist = Math.sqrt(relX*relX + relY*relY);
-                    if(dist > maxR) {
-                        let ratio = maxR / dist;
-                        relX *= ratio;
-                        relY *= ratio;
-                    }
-                    
-                    return {
-                        x: (bedSize / 2) + relX,
-                        y: (bedSize / 2) - relY 
-                    };
-                });
-
-                layerPoints = transformedPoly;
-
-                if(layerPoints.length > 0) {
-                    const first = layerPoints[0];
-                    const last = layerPoints[layerPoints.length - 1];
-                    if (first.x !== last.x || first.y !== last.y) {
-                        layerPoints.push({ x: first.x, y: first.y });
-                    }
-                }
-            }
-        }
-
-        const isEmpty = layerPoints.length === 0;
-
-        if (!isEmpty || mode === 'CYLINDER') {
-            // --- BASE GENERATION TRIGGER ---
-            // If base enabled, not yet generated, and we have valid points:
-            if(document.getElementById('genBase').checked && !baseGenerated) {
-                generateBaseFromPoly(layerPoints);
-                baseGenerated = true;
-                // Note: generateBaseFromPoly updates currentZ to top of base. 
-                // We then continue to generate the current live layer on top of it.
-            }
-            
-            // --- NORMAL WALL GENERATION ---
-            consecutiveEmptyLayers = 0;
-
-            let layerMoves = [];
-            
-            if(layerPoints.length > 0) {
-                let start = layerPoints[0];
-                layerMoves.push({ type: 'G0', x: start.x, y: start.y, z: currentZ });
-                
-                for(let i=1; i<layerPoints.length; i++) {
-                    let p = layerPoints[i];
-                    layerMoves.push({ type: 'G1', x: p.x, y: p.y, z: currentZ });
-                    add3DLine(
-                        {x:layerPoints[i-1].x, y:layerPoints[i-1].y, z:currentZ}, 
-                        {x:p.x, y:p.y, z:currentZ}, 
-                        true, 'wall'
-                    );
-                }
-            }
-
-            gcodeMoves.push(...layerMoves);
-            updateEstimates(layerMoves);
-            
-            if(layerMoves.length > 0) {
-                let last = layerMoves[layerMoves.length-1];
-                nozzleMesh.position.set(last.x, last.y, last.z);
-            }
-            
-            currentZ += layerH;
-            currentLayer++;
-            
-            zDisplay.innerText = currentZ.toFixed(2);
-            layerDisplay.innerText = currentLayer;
-
-        } else {
-            consecutiveEmptyLayers++;
-            if(consecutiveEmptyLayers > EMPTY_LAYER_THRESHOLD) {
-                console.log("Auto-stopping");
-                stopScanning();
-            }
-        }
-    }
-
-    // --- Three.js Dynamic Updates ---
-
-    function initThreeJS() {
-        const container = document.getElementById('canvas3d-container');
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color('#000000'); // Pure Black
-        // Increased Fog distance to allow seeing large objects
-        scene.fog = new THREE.Fog('#000000', 100, 2000); 
-
-        // Increased Camera Far clip to 5000
-        camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 5000);
-        camera.position.set(0, -120, 100);
-        camera.up.set(0, 0, 1);
-
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        renderer.shadowMap.enabled = true;
-        container.appendChild(renderer.domElement);
-
-        controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.autoRotate = false; // Disable auto rotate for manual inspection
-        controls.dampingFactor = 0.1;
-
-        // Dark Lighting
-        const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.4);
-        scene.add(hemi);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(50, -50, 100);
-        scene.add(dirLight);
-
-        // Bed (Minimalist) - Made grid slightly brighter for visibility
-        gridHelper = new THREE.GridHelper(220, 44, 0x555555, 0x222222); 
-        gridHelper.rotation.x = Math.PI / 2;
-        scene.add(gridHelper);
-        
-        // Nozzle (Small White Dot)
-        const nozzleGeo = new THREE.SphereGeometry(0.8, 16, 16); // Small sphere
-        const nozzleMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Bright white unlit
-        nozzleMesh = new THREE.Mesh(nozzleGeo, nozzleMat);
-        scene.add(nozzleMesh);
-
-        initDynamicGeometry();
-        initBoundsHelper();
-        
-        // Ensure initial fit
-        setTimeout(updateSceneDimensions, 100);
-
-        window.addEventListener('resize', onWindowResize, false);
-        animate();
-    }
-
-    function initBoundsHelper() {
-        // Create Bounding Box Visual
-        const w = parseFloat(document.getElementById('targetWidth').value);
-        const h = parseFloat(document.getElementById('modelHeight').value);
-        
-        const geometry = new THREE.BoxGeometry(w, w, h);
-        // Translate geometry so bottom sits on 0
-        geometry.translate(w/2, w/2, h/2); 
-        
-        const edges = new THREE.EdgesGeometry(geometry);
-        // Made Color Brighter (0x888888) and Opacity Higher (0.5)
-        boundsBox = new THREE.LineSegments(edges, new THREE.LineBasicMaterial( { color: 0x888888, transparent: true, opacity: 0.5, depthTest: false } ));
-        scene.add(boundsBox);
-        
-        // Sync visibility
-        toggleBoundingBox();
-    }
-
-    window.updateSceneDimensions = function() {
-        const w = parseFloat(document.getElementById('targetWidth').value);
-        const h = parseFloat(document.getElementById('modelHeight').value);
-        
-        // 1. Rebuild Bounding Box
-        if(boundsBox) {
-            boundsBox.geometry.dispose();
-            const geometry = new THREE.BoxGeometry(w, w, h);
-            geometry.translate(w/2, w/2, h/2);
-            boundsBox.geometry = new THREE.EdgesGeometry(geometry);
-        }
-        
-        // 2. Update Grid Helper to match base dimension + 20% margin
-        if(gridHelper) {
-            scene.remove(gridHelper);
-            // Size: max of w, or standard min 200. Divisions: every 10mm approx
-            let gridSize = Math.max(w * 1.5, 200);
-            let divisions = Math.floor(gridSize / 10);
-            gridHelper = new THREE.GridHelper(gridSize, divisions, 0x555555, 0x222222);
-            gridHelper.rotation.x = Math.PI / 2;
-            // Grid is centered at 0,0 by default. Move to center of bed.
-            gridHelper.position.set(w/2, w/2, 0);
-            scene.add(gridHelper);
-        }
-
-        // 3. Auto Fit Camera
-        fitView();
-    }
-    
-    window.fitView = function() {
-        if(!camera || !controls) return;
-        const w = parseFloat(document.getElementById('targetWidth').value);
-        const h = parseFloat(document.getElementById('modelHeight').value);
-        
-        const size = Math.max(w, h);
-        const center = new THREE.Vector3(w/2, w/2, h/2); // Center of volume
-        
-        // Calculate distance to fit object
-        const fov = camera.fov * (Math.PI / 180);
-        let dist = Math.abs(size / Math.tan(fov / 2)) * 1.5; // Increased buffer
-        
-        // Clamp min distance to avoid clipping
-        dist = Math.max(dist, 100);
-
-        // Move camera to a nice isometric-ish angle
-        const offset = new THREE.Vector3(0, -dist, dist * 0.6); 
-        
-        camera.position.copy(center).add(offset);
-        controls.target.copy(center);
-        controls.update();
-    }
-
-    window.toggleBoundingBox = function() {
-        if(boundsBox) {
-            boundsBox.visible = document.getElementById('showBounds').checked;
-        }
-    }
-
-    function initDynamicGeometry() {
-        const geometry = new THREE.BufferGeometry();
-        linePositions = new Float32Array(MAX_POINTS * 3);
-        lineColors = new Float32Array(MAX_POINTS * 3);
-        
-        geometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
-        geometry.setDrawRange(0, 0);
-
-        // Brighter Blue for lines against black
-        const material = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2, transparent: true, opacity: 0.9 });
-        livePrintMesh = new THREE.LineSegments(geometry, material);
-        livePrintMesh.frustumCulled = false; 
-        scene.add(livePrintMesh);
-        
-        drawCount = 0;
-    }
-
-    function add3DLine(p1, p2, isExtrude, type = 'wall') {
-        if (drawCount + 2 >= MAX_POINTS) return; 
-
-        if (!isExtrude) return; 
-
-        linePositions[drawCount * 3] = p1.x;
-        linePositions[drawCount * 3 + 1] = p1.y;
-        linePositions[drawCount * 3 + 2] = p1.z;
-        
-        linePositions[drawCount * 3 + 3] = p2.x;
-        linePositions[drawCount * 3 + 4] = p2.y;
-        linePositions[drawCount * 3 + 5] = p2.z;
-
-        // Default Blue: #8ab4f8 -> RGB: 0.54, 0.70, 0.97
-        let col = {r:0.54, g:0.70, b:0.97}; 
-        
-        // Base Color: Greenish #4caf50 -> RGB: 0.30, 0.69, 0.31
-        if (type === 'base') {
-            col = {r:0.30, g:0.69, b:0.31};
-        }
-        
-        for(let i=0; i<2; i++) { 
-            lineColors[(drawCount + i) * 3] = col.r;
-            lineColors[(drawCount + i) * 3 + 1] = col.g;
-            lineColors[(drawCount + i) * 3 + 2] = col.b;
-        }
-
-        drawCount += 2;
-        livePrintMesh.geometry.setDrawRange(0, drawCount);
-        livePrintMesh.geometry.attributes.position.needsUpdate = true;
-        livePrintMesh.geometry.attributes.color.needsUpdate = true;
-    }
-
-    window.resetApp = function() {
-        stopScanning();
-        drawCount = 0;
-        currentZ = 0;
-        currentLayer = 0;
-        gcodeMoves = [];
-        
-        livePrintMesh.geometry.setDrawRange(0, 0);
-        
-        zDisplay.innerText = "0.00";
-        layerDisplay.innerText = "0";
-        
-        totalTimeSeconds = 0;
-        totalFilamentMM = 0;
-        updateStatsUI();
-        
-        document.getElementById('emptyState').style.display = 'flex';
-        nozzleMesh.position.set(0,0,0);
-        lastValidPolygon = null;
-        baseGenerated = false;
-    }
-
-    function animate() {
-        requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
-    }
-
-    function onWindowResize() {
-        const container = document.getElementById('canvas3d-container');
-        camera.aspect = container.clientWidth / container.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(container.clientWidth, container.clientHeight);
-    }
-
-    window.exportDxf = function() {
-        if(gcodeMoves.length === 0) return alert("No model generated yet.");
-        
-        let dxfContent = [];
-        
-        // DXF Header
-        dxfContent.push("  0", "SECTION", "  2", "HEADER", "  9", "$ACADVER", "  1", "AC1009", "  0", "ENDSEC");
-        
-        // Entities Section
-        dxfContent.push("  0", "SECTION", "  2", "ENTITIES");
-        
-        let lastPos = {x:0, y:0, z:0};
-        
-        for (let i = 0; i < gcodeMoves.length; i++) {
-            let m = gcodeMoves[i];
-            
-            // Only draw lines for G1 (Extrusion) moves
-            if (m.type === 'G1') {
-                dxfContent.push("  0", "LINE");
-                dxfContent.push("  8", "0"); // Layer 0
-                
-                // Start Point (Previous Position)
-                dxfContent.push(" 10", lastPos.x.toFixed(4));
-                dxfContent.push(" 20", lastPos.y.toFixed(4));
-                dxfContent.push(" 30", lastPos.z.toFixed(4));
-                
-                // End Point (Current Position)
-                dxfContent.push(" 11", m.x.toFixed(4));
-                dxfContent.push(" 21", m.y.toFixed(4));
-                dxfContent.push(" 31", m.z.toFixed(4));
-            }
-            
-            // Update position for next iteration
-            lastPos = {x: m.x, y: m.y, z: m.z};
-        }
-        
-        // Footer
-        dxfContent.push("  0", "ENDSEC", "  0", "EOF");
-        
-        // Create Blob and Download
-        const blob = new Blob([dxfContent.join('\r\n')], {type: "application/dxf"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "vision_scan_model.dxf";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    }
-
-    window.exportGcode = function() {
-        if(gcodeMoves.length === 0) return alert("No model generated yet.");
-        
-        let txt = [
-            ";--START GCODE--",
-            ";M104 S220 ; Set Extruder temperature",
-            ";M140 S55 ; Set Heat Bed temperature",
-            ";M190 S55 ; Wait for Heat Bed temperature",
-            ";M109 S220 ; Wait for Extruder temperature",
-            "M140 S60",
-            "M105",
-            "M190 S60",
-            "M104 S200",
-            "M105",
-            "M109 S200",
-            "G28 ; Home all axes",
-            "M117 Purge extruder",
-            "G92 E0 ; Reset Extruder",
-            "G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed",
-            "G1 X0.1 Y20 Z0.3 F5000.0 ; Move to start position",
-            "G1 X0.1 Y200.0 Z0.3 F1500.0 E15 ; Draw the first line",
-            "G1 X0.4 Y200.0 Z0.3 F5000.0 ; Move to side a little",
-            "G1 X0.4 Y20 Z0.3 F1500.0 E30 ; Draw the second line",
-            "G92 E0 ; Reset Extruder",
-            "G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed",
-            "M82 ;absolute extrusion mode",
-            ";--END OF START GCODE--"
-        ];
-
-        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
-        const layerH = parseFloat(document.getElementById('layerHeight').value); 
-        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
-        const flowRatio = parseFloat(document.getElementById('flowRatio').value) || 1.0;
-        
-        // --- NEW EXTRUSION CALCULATION ---
-        // INCREASED LINE WIDTH MULTIPLIER: 1.125 -> 1.25
-        // This creates wider lines for better adhesion
-        const lineWidth = nozzle * 1.25;
-        
-        // Area of filament cross section (pi * r^2)
-        const filamentArea = Math.PI * Math.pow(filDia / 2, 2);
-        // Volumetric flow requirement per mm of movement
-        // Volume = width * height * 1mm
-        // E-step = Volume / filamentArea
-        // Added Flow Ratio multiplier
-        const ePerMM = ((lineWidth * layerH) / filamentArea) * flowRatio;
-        
-        let e = 0;
-        let lastPos = {x:0, y:0};
-        
-        // Retraction Settings
-        const retractDist = 4.0; // mm
-        const retractSpeed = 2400; // mm/min
-        const printSpeed = parseFloat(document.getElementById('printSpeed').value) || 1800; 
-
-        gcodeMoves.forEach((m, index) => {
-            if(m.type === 'G0') {
-                // --- SMART RETRACTION LOGIC ---
-                if (index > 0) {
-                    txt.push(`; Retract`);
-                    txt.push(`G1 F${retractSpeed} E${(e - retractDist).toFixed(5)}`);
-                }
-
-                txt.push(`G0 F3000 X${m.x.toFixed(3)} Y${m.y.toFixed(3)} Z${m.z.toFixed(3)}`);
-
-                if (index > 0) {
-                    txt.push(`; Un-retract`);
-                    txt.push(`G1 F${retractSpeed} E${e.toFixed(5)}`);
-                }
-            } else {
-                let dist = Math.hypot(m.x - lastPos.x, m.y - lastPos.y);
-                e += dist * ePerMM;
-                txt.push(`G1 F${printSpeed} X${m.x.toFixed(3)} Y${m.y.toFixed(3)} Z${m.z.toFixed(3)} E${e.toFixed(5)}`);
-            }
-            lastPos = {x:m.x, y:m.y};
-        });
-        
-        // Add Custom End G-Code
-        txt.push(
-            "",
-            ";--END GCODE--",
-            "G91 ;Relative positioning",
-            "M220 S100 ; Reset Speed factor override percentage to default (100%)",
-            "M221 S100 ; Reset Extrude factor override percentage to default (100%)",
-            "G91 ; Set coordinates to relative",
-            "G1 F1800 E-3 ; Retract filament 3 mm to prevent oozing",
-            "G1 F3000 Z20 ; Move Z Axis up 20 mm to allow filament ooze freely",
-            "G90 ; Set coordinates to absolute",
-            "G1 X0 Y245 F1000 ; Move Heat Bed to the front for easy print removal",
-            "M106 S0 ; Turn off cooling fan",
-            "M104 S0 ; Turn off extruder",
-            "M140 S0 ; Turn off bed",
-            "M107 ; Turn off Fan",
-            "M84 ; Disable stepper motors",
-            ";--END OF END GCODE--"
-        );
-
-        const blob = new Blob([txt.join('\n')], {type: "text/plain"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "vision_lab_print.gcode";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    }
+    // --- Global Variables ---
+    let stream = null;
+    let cvReady = false;
+    let video = document.getElementById('videoInput');
+    let startBtn = document.getElementById('startCamBtn');
+    let toggleScanBtn = document.getElementById('toggleScanBtn');
+    let streaming = false;
+    let isVideoFile = false;
+
+    // Scanning State
+    let isScanning = false;
+    let scanIntervalId = null;
+    let currentZ = 0;
+    let currentLayer = 0;
+    let gcodeMoves = []; 
+    let baseGenerated = false; // Flag to track if base has been generated
+    
+    // Estimates
+    let totalTimeSeconds = 0;
+    let totalFilamentMM = 0;
+    
+    // Three.js Dynamic Geometry Buffers
+    const MAX_POINTS = 1000000;
+    let linePositions, lineColors;
+    let drawCount = 0;
+
+    // OpenCV objects
+    let src = null, dst = null, cap = null, contours = null, hierarchy = null;
+
+    // Three.js objects
+    let scene, camera, renderer, controls;
+    let livePrintMesh; 
+    let nozzleMesh;
+    let boundsBox; // Bounding box helper
+    let gridHelper; // Global grid
+    
+    // UI Elements
+    const sliderT1 = document.getElementById('threshold1');
+    const sliderT2 = document.getElementById('threshold2');
+    const sliderTex = document.getElementById('textureDepth');
+    const modeSelect = document.getElementById('generationMode');
+    
+    const labelTex = document.getElementById('val-tex');
+    const statusBadge = document.getElementById('statusBadge');
+    const camPlaceholder = document.getElementById('camPlaceholder');
+    const liveStatus = document.getElementById('liveStatus');
+    const zDisplay = document.getElementById('currentZDisplay');
+    const layerDisplay = document.getElementById('currentLayerDisplay');
+    const estTimeDisplay = document.getElementById('estTimeDisplay');
+    const estFilamentDisplay = document.getElementById('estFilamentDisplay');
+    
+    // Status Indicators
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+
+    // --- Initialization ---
+
+    function onOpenCvReady() {
+        console.log('OpenCV Ready');
+        document.getElementById('loading').style.display = 'none';
+        cvReady = true;
+        startBtn.disabled = false;
+        initThreeJS();
+    }
+
+    sliderTex.oninput = () => labelTex.innerText = sliderTex.value;
+
+    // --- Vision Logic ---
+
+    startBtn.addEventListener('click', () => {
+        if (streaming && !isVideoFile) {
+            stopInput();
+        } else {
+            stopInput();
+            startCamera();
+        }
+    });
+
+    window.handleVideoUpload = function(input) {
+        if (input.files && input.files[0]) {
+            stopInput();
+            const file = input.files[0];
+            const url = URL.createObjectURL(file);
+            video.src = url;
+            video.loop = false; 
+            
+            streaming = true;
+            isVideoFile = true;
+            
+            enableUI(true);
+            statusBadge.innerText = "VIDEO";
+            
+            video.oncanplay = function() {
+                video.oncanplay = null; 
+                setTimeout(() => {
+                    if(!streaming) return;
+                    initCvObjects();
+                    startScanning();
+                }, 500); 
+            };
+            
+            video.onended = function() {
+                if(isScanning) stopScanning();
+            };
+
+            video.play().catch(e => console.error("Video play failed:", e));
+        }
+        input.value = '';
+    }
+
+    function startCamera() {
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+            .then(function(s) {
+                stream = s;
+                video.srcObject = stream;
+                video.play();
+                streaming = true;
+                isVideoFile = false;
+
+                enableUI(true);
+                startBtn.innerHTML = `Stop`;
+                startBtn.classList.replace('bg-[#8ab4f8]', 'bg-[#f28b82]'); 
+                startBtn.classList.replace('text-[#202124]', 'text-[#202124]');
+                startBtn.classList.replace('hover:bg-[#aecbfa]', 'hover:bg-[#f6aea9]');
+                
+                statusBadge.innerText = "LIVE";
+                statusBadge.classList.replace('text-[#8ab4f8]', 'text-[#81c995]');
+                statusBadge.classList.replace('border-[#8ab4f8]/30', 'border-[#81c995]/30');
+                
+                video.oncanplay = function() { 
+                    video.oncanplay = null;
+                    setTimeout(initCvObjects, 500); 
+                };
+            })
+            .catch(function(err) {
+                console.error("Camera Error:", err);
+                alert("无法访问摄像头。请允许权限。");
+            });
+    }
+
+    function stopInput() {
+        if(isScanning) stopScanning();
+
+        if (!streaming) return;
+        streaming = false;
+        video.pause();
+        if(stream) { stream.getTracks().forEach(track => track.stop()); stream = null; video.srcObject = null; }
+        if(video.src) { URL.revokeObjectURL(video.src); video.src = ""; }
+        
+        // SAFE CLEANUP
+        if(src) { try{src.delete();}catch(e){} src = null; }
+        if(dst) { try{dst.delete();}catch(e){} dst = null; }
+        if(contours) { try{contours.delete();}catch(e){} contours = null; }
+        if(hierarchy) { try{hierarchy.delete();}catch(e){} hierarchy = null; }
+        if(cap) { try{if(typeof cap.delete === 'function') cap.delete();}catch(e){} cap = null; }
+        
+        let ctx = document.getElementById('canvasOutput').getContext('2d');
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        
+        enableUI(false);
+        startBtn.innerHTML = `Camera`;
+        startBtn.className = "bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2";
+        
+        statusBadge.innerText = "IDLE";
+        statusBadge.className = "text-[10px] text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded";
+    }
+
+    function enableUI(enabled) {
+        toggleScanBtn.disabled = !enabled;
+        camPlaceholder.style.display = enabled ? 'none' : 'flex';
+    }
+
+    function initCvObjects() {
+        if(!streaming) return;
+        let width = video.videoWidth;
+        let height = video.videoHeight;
+        video.width = width;
+        video.height = height;
+        let canvas = document.getElementById('canvasOutput');
+        canvas.width = width;
+        canvas.height = height;
+
+        src = new cv.Mat(height, width, cv.CV_8UC4);
+        dst = new cv.Mat(height, width, cv.CV_8UC1);
+        contours = new cv.MatVector();
+        hierarchy = new cv.Mat();
+        cap = new cv.VideoCapture(video);
+
+        requestAnimationFrame(processVideoFrame);
+    }
+
+    function processVideoFrame() {
+        if (!streaming) return;
+        try {
+            if(!cap) return;
+            cap.read(src);
+            cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
+            cv.GaussianBlur(dst, dst, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+            cv.Canny(dst, dst, parseInt(sliderT1.value), parseInt(sliderT2.value), 3, false);
+            cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+            let minArea = 100;
+            for (let i = 0; i < contours.size(); ++i) {
+                let cnt = contours.get(i);
+                if(cnt) {
+                    if (cv.contourArea(cnt) > minArea) {
+                        cv.drawContours(src, contours, i, new cv.Scalar(138, 180, 248, 255), 2, cv.LINE_8, hierarchy, 0); // #8ab4f8
+                    }
+                    cnt.delete(); 
+                }
+            }
+            cv.imshow('canvasOutput', src);
+        } catch (e) { console.log("Stream ended/Error in loop"); }
+        requestAnimationFrame(processVideoFrame);
+    }
+
+    // --- Live Scanning / Printing Logic ---
+
+    toggleScanBtn.addEventListener('click', () => {
+        if(isScanning) stopScanning();
+        else startScanning();
+    });
+
+    function startScanning() {
+        if(!streaming) return alert("Please start camera source first.");
+        
+        // --- VIDEO REPLAY & RESET ---
+        if(isVideoFile) {
+            if (video.paused || video.ended) {
+                video.currentTime = 0;
+                video.play();
+                // Reset logic handled below
+            }
+        }
+        
+        // Reset State
+        isScanning = true;
+        baseGenerated = false; // Reset base generation flag
+        gcodeMoves = [];
+        drawCount = 0;
+        totalTimeSeconds = 0;
+        totalFilamentMM = 0;
+        currentZ = 0;
+        currentLayer = 0;
+        
+        if(livePrintMesh) livePrintMesh.geometry.setDrawRange(0, 0);
+        zDisplay.innerText = "0.00";
+        layerDisplay.innerText = "0";
+        updateStatsUI();
+        nozzleMesh.position.set(0,0,0);
+
+        toggleScanBtn.innerHTML = `<span>STOP BUILD</span>`;
+        toggleScanBtn.classList.add('border-[#f28b82]', 'text-[#f28b82]');
+        toggleScanBtn.classList.remove('border-gray-600', 'text-[#8ab4f8]');
+        
+        liveStatus.style.display = 'flex';
+        updateStatus("BUILDING", "#f28b82", "pulse-red");
+        
+        document.getElementById('emptyState').style.display = 'none';
+
+        let speed = parseInt(document.getElementById('scanSpeed').value);
+        scanIntervalId = setInterval(processOneLayer, speed);
+    }
+
+    function updateStatus(text, colorHex, animClass) {
+        statusText.innerText = text;
+        statusDot.style.backgroundColor = colorHex;
+        if (animClass) {
+            statusDot.className = `w-2 h-2 rounded-full ${animClass}`;
+        } else {
+            statusDot.className = `w-2 h-2 rounded-full`;
+        }
+    }
+
+    // NEW: Generate Base from a polygon shape using SCANLINE fill (0 and 90 degrees)
+    function generateBaseFromPoly(polygon) {
+        const bedSize = parseFloat(document.getElementById('targetWidth').value);
+        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
+        const layerH = parseFloat(document.getElementById('layerHeight').value);
+        const baseLayers = 3; 
+        
+        const spacing = nozzle * 1.25; // Line spacing for fill
+        
+        // Get bounding box of polygon for scanning
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        polygon.forEach(p => {
+            if(p.x < minX) minX = p.x; if(p.x > maxX) maxX = p.x;
+            if(p.y < minY) minY = p.y; if(p.y > maxY) maxY = p.y;
+        });
+
+        console.log("Generating Rectilinear Base from Shape...");
+        let baseMoves = [];
+
+        // --- Helper: Intersect Scanline ---
+        // Returns list of intersection points (x for horizontal scan, y for vertical)
+        function getIntersections(val, isHorizontal) {
+            let intersections = [];
+            for (let i = 0; i < polygon.length; i++) {
+                let p1 = polygon[i];
+                let p2 = polygon[(i + 1) % polygon.length];
+                
+                let v1 = isHorizontal ? p1.y : p1.x;
+                let v2 = isHorizontal ? p2.y : p2.x;
+                
+                // Check if scanline crosses edge
+                if (((v1 <= val) && (v2 > val)) || ((v1 > val) && (v2 <= val))) {
+                    // Calc intersect
+                    let t = (val - v1) / (v2 - v1);
+                    let intVal = isHorizontal 
+                        ? p1.x + t * (p2.x - p1.x)
+                        : p1.y + t * (p2.y - p1.y);
+                    intersections.push(intVal);
+                }
+            }
+            return intersections.sort((a, b) => a - b);
+        }
+
+        // --- Generate Layers ---
+        for(let l=1; l<=baseLayers; l++) {
+            let z = l * layerH;
+            
+            // 1. Draw Perimeters (1 shell)
+            if(polygon.length > 0) {
+                // Travel to start
+                baseMoves.push({ type: 'G0', x: polygon[0].x, y: polygon[0].y, z: z });
+                // Extrude Loop
+                for(let i=1; i<polygon.length; i++) {
+                    baseMoves.push({ type: 'G1', x: polygon[i].x, y: polygon[i].y, z: z });
+                    add3DLine(polygon[i-1], polygon[i], true, 'base');
+                }
+                // Close
+                baseMoves.push({ type: 'G1', x: polygon[0].x, y: polygon[0].y, z: z });
+                add3DLine(polygon[polygon.length-1], polygon[0], true, 'base');
+            }
+
+            // 2. Generate Infill
+            // Layer 1 & 3: Horizontal (0 deg)
+            // Layer 2: Vertical (90 deg)
+            let isHorizontal = (l % 2 !== 0); 
+            
+            let startVal = isHorizontal ? minY : minX;
+            let endVal = isHorizontal ? maxY : maxX;
+            
+            // Inset slightly to not overlap perimeter
+            startVal += spacing;
+            endVal -= spacing;
+
+            for (let val = startVal; val <= endVal; val += spacing) {
+                let intersects = getIntersections(val, isHorizontal);
+                
+                // Draw segments between pairs
+                for (let i = 0; i < intersects.length - 1; i += 2) {
+                    let pStart, pEnd;
+                    
+                    if (isHorizontal) {
+                        pStart = { x: intersects[i], y: val };
+                        pEnd = { x: intersects[i+1], y: val };
+                    } else {
+                        pStart = { x: val, y: intersects[i] };
+                        pEnd = { x: val, y: intersects[i+1] };
+                    }
+                    
+                    baseMoves.push({ type: 'G0', x: pStart.x, y: pStart.y, z: z });
+                    baseMoves.push({ type: 'G1', x: pEnd.x, y: pEnd.y, z: z });
+                    add3DLine(pStart, pEnd, true, 'base');
+                }
+            }
+            
+            currentZ = z;
+            currentLayer = l;
+        }
+        
+        gcodeMoves.push(...baseMoves);
+        updateEstimates(baseMoves);
+        zDisplay.innerText = currentZ.toFixed(2);
+        layerDisplay.innerText = currentLayer;
+        
+        // Prepare Z for next live layer (Layer 4)
+        currentZ += layerH;
+    }
+
+    function stopScanning() {
+        isScanning = false;
+        clearInterval(scanIntervalId);
+        
+        if(isVideoFile && streaming && !video.ended) {
+             video.pause();
+        }
+        
+        toggleScanBtn.innerHTML = `<span>START BUILD</span>`;
+        toggleScanBtn.classList.remove('border-[#f28b82]', 'text-[#f28b82]');
+        toggleScanBtn.classList.add('border-gray-600', 'text-[#8ab4f8]');
+        
+        setTimeout(() => liveStatus.style.display = 'none', 1000);
+    }
+
+    function updateEstimates(newMoves) {
+        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
+        const layerH = parseFloat(document.getElementById('layerHeight').value); 
+        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
+        const flowRatio = parseFloat(document.getElementById('flowRatio').value) || 1.0;
+        const printSpeedMin = parseFloat(document.getElementById('printSpeed').value) || 1800; 
+        const printSpeedSec = printSpeedMin / 60; 
+        
+        const travelSpeedMin = 3000; 
+        const travelSpeedSec = travelSpeedMin / 60;
+        
+        const retractDist = 4.0;
+        const retractSpeedMin = 2400;
+        const retractTime = (retractDist / (retractSpeedMin / 60)) * 2; 
+
+        const lineWidth = nozzle * 1.25;
+        const filamentArea = Math.PI * Math.pow(filDia / 2, 2);
+        const ePerMM = ((lineWidth * layerH) / filamentArea) * flowRatio;
+
+        let lastPos = null;
+        if(gcodeMoves.length > newMoves.length) {
+             let prevMove = gcodeMoves[gcodeMoves.length - newMoves.length - 1];
+             lastPos = { x: prevMove.x, y: prevMove.y, z: prevMove.z };
+        } else {
+             lastPos = { x: 0, y: 0, z: 0 };
+        }
+
+        newMoves.forEach(m => {
+            let dist = Math.hypot(m.x - lastPos.x, m.y - lastPos.y);
+            
+            if(m.type === 'G0') {
+                totalTimeSeconds += (dist / travelSpeedSec);
+                if(dist > 2.0) totalTimeSeconds += retractTime;
+            } else {
+                totalTimeSeconds += (dist / printSpeedSec);
+                totalFilamentMM += (dist * ePerMM);
+            }
+            lastPos = { x: m.x, y: m.y, z: m.z };
+        });
+        
+        updateStatsUI();
+    }
+
+    function updateStatsUI() {
+        let h = Math.floor(totalTimeSeconds / 3600);
+        let m = Math.floor((totalTimeSeconds % 3600) / 60);
+        let s = Math.floor(totalTimeSeconds % 60);
+        
+        let timeStr = "";
+        if(h > 0) timeStr += `${h}h `;
+        timeStr += `${m}m ${s}s`;
+        estTimeDisplay.innerText = timeStr;
+
+        let meters = (totalFilamentMM / 1000).toFixed(2);
+        
+        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
+        const area = Math.PI * Math.pow(filDia/2, 2);
+        const volumeCM3 = (totalFilamentMM * area) / 1000;
+        const weight = (volumeCM3 * 1.24).toFixed(1);
+        
+        estFilamentDisplay.innerText = `${meters}m / ${weight}g`;
+    }
+
+    function processOneLayer() {
+        if(!isScanning || !contours) return;
+
+        const maxH = parseFloat(document.getElementById('modelHeight').value);
+        const layerH = parseFloat(document.getElementById('layerHeight').value);
+        const bedSize = parseFloat(document.getElementById('targetWidth').value); 
+        const mode = modeSelect.value;
+        const textureFactor = parseFloat(sliderTex.value);
+
+        if (currentZ === 0) currentZ = layerH;
+
+        if (currentZ > maxH) {
+            stopScanning();
+            return;
+        }
+
+        let layerPoints = [];
+
+        // --- MODE 1: CYLINDER TEXTURE (VASE) ---
+        if (mode === 'CYLINDER') {
+            const numSegments = 72; 
+            const maxRadius = bedSize / 2; 
+            const safetyMargin = 10.0;
+            const absoluteMaxRadius = Math.max(5, maxRadius - safetyMargin); 
+            const baseRadius = Math.max(10, maxRadius - 50.0); 
+            const center = { x: video.width / 2, y: video.height / 2 };
+            let radii = new Array(numSegments).fill(0); 
+            
+            let totalDist = 0;
+            let activePoints = 0;
+
+            if (contours.size() > 0) {
+                 for (let i = 0; i < contours.size(); ++i) {
+                    let cnt = contours.get(i);
+                    // FIX: Ensure cnt exists and DELETE it after use
+                    if(cnt) {
+                        const data = cnt.data32S;
+                        if(data) {
+                            for (let j = 0; j < data.length; j += 2) {
+                                let px = data[j];
+                                let py = data[j+1];
+                                
+                                let dx = px - center.x;
+                                let dy = py - center.y;
+                                let dist = Math.sqrt(dx*dx + dy*dy);
+                                
+                                totalDist += dist;
+                                activePoints++;
+
+                                let angle = Math.atan2(dy, dx); 
+                                if(angle < 0) angle += Math.PI * 2;
+                                
+                                let bin = Math.floor((angle / (Math.PI * 2)) * numSegments) % numSegments;
+                                
+                                let normDist = dist / (video.width/2);
+                                if(normDist > radii[bin]) radii[bin] = normDist;
+                            }
+                        }
+                        cnt.delete(); 
+                    }
+                 }
+            }
+
+            let layerThicknessOffset = 0;
+            if (activePoints > 0) {
+                const avgDist = totalDist / activePoints;
+                const normAvg = avgDist / (video.width / 2);
+                layerThicknessOffset = normAvg * 20.0; 
+            }
+
+            for (let i = 0; i <= numSegments; i++) {
+                let idx = i % numSegments;
+                let angle = (i / numSegments) * Math.PI * 2;
+                let r = baseRadius + layerThicknessOffset + (radii[idx] * textureFactor * 5.0); 
+                
+                if (r > absoluteMaxRadius) r = absoluteMaxRadius;
+
+                let finalX = (bedSize / 2) + (Math.cos(angle) * r);
+                let finalY = (bedSize / 2) + (Math.sin(angle) * r);
+
+                layerPoints.push({ x: finalX, y: finalY });
+            }
+        } 
+        // --- MODE 2: SHAPE SCAN (PRECISE) ---
+        else {
+             let bestPoly = null;
+             let maxArea = 0;
+
+             if(contours.size() > 0) {
+                for (let i = 0; i < contours.size(); ++i) {
+                    let cnt = contours.get(i);
+                    // FIX: Ensure cnt exists and DELETE it after use
+                    if(cnt) {
+                        let area = cv.contourArea(cnt);
+                        if (area > 100 && area > maxArea) {
+                            maxArea = area;
+                            let tempPoly = [];
+                            const data = cnt.data32S;
+                            if(data) {
+                                for (let j = 0; j < data.length; j += 2) {
+                                    tempPoly.push({ x: data[j], y: data[j+1] });
+                                }
+                            }
+                            bestPoly = tempPoly;
+                        }
+                        cnt.delete();
+                    }
+                }
+            }
+            
+            // --- CRITICAL FIX: SMART PAUSE LOGIC ---
+            // If no shape is found in this frame, we STOP incrementing Z.
+            // We do NOT use the old polygon. We wait for a new valid image.
+            if (!bestPoly) {
+                // UI Feedback: Waiting
+                updateStatus("WAITING SIGNAL", "#fdd663", "pulse-yellow");
+                // Return immediately without printing or moving Z up
+                return; 
+            } else {
+                // Restore Status
+                updateStatus("BUILDING", "#f28b82", "pulse-red");
+            }
+
+            if (bestPoly) {
+                let scaleFactor = bedSize / video.videoWidth; 
+                const centerX = bedSize / 2;
+                const centerY = (video.videoHeight * scaleFactor) / 2; 
+                const maxR = (bedSize / 2) - 5; 
+                
+                let transformedPoly = bestPoly.map(p => {
+                    let relX = (p.x * scaleFactor) - centerX;
+                    let relY = (p.y * scaleFactor) - centerY; 
+                    
+                    let dist = Math.sqrt(relX*relX + relY*relY);
+                    if(dist > maxR) {
+                        let ratio = maxR / dist;
+                        relX *= ratio;
+                        relY *= ratio;
+                    }
+                    
+                    return {
+                        x: (bedSize / 2) + relX,
+                        y: (bedSize / 2) - relY 
+                    };
+                });
+
+                layerPoints = transformedPoly;
+
+                if(layerPoints.length > 0) {
+                    const first = layerPoints[0];
+                    const last = layerPoints[layerPoints.length - 1];
+                    if (first.x !== last.x || first.y !== last.y) {
+                        layerPoints.push({ x: first.x, y: first.y });
+                    }
+                }
+            }
+        }
+
+        const isEmpty = layerPoints.length === 0;
+
+        if (!isEmpty || mode === 'CYLINDER') {
+            // --- BASE GENERATION TRIGGER ---
+            if(document.getElementById('genBase').checked && !baseGenerated) {
+                generateBaseFromPoly(layerPoints);
+                baseGenerated = true;
+            }
+            
+            // --- NORMAL WALL GENERATION ---
+
+            let layerMoves = [];
+            
+            if(layerPoints.length > 0) {
+                let start = layerPoints[0];
+                layerMoves.push({ type: 'G0', x: start.x, y: start.y, z: currentZ });
+                
+                for(let i=1; i<layerPoints.length; i++) {
+                    let p = layerPoints[i];
+                    layerMoves.push({ type: 'G1', x: p.x, y: p.y, z: currentZ });
+                    add3DLine(
+                        {x:layerPoints[i-1].x, y:layerPoints[i-1].y, z:currentZ}, 
+                        {x:p.x, y:p.y, z:currentZ}, 
+                        true, 'wall'
+                    );
+                }
+            }
+
+            gcodeMoves.push(...layerMoves);
+            updateEstimates(layerMoves);
+            
+            if(layerMoves.length > 0) {
+                let last = layerMoves[layerMoves.length-1];
+                nozzleMesh.position.set(last.x, last.y, last.z);
+            }
+            
+            // Only increment Z if we actually successfully processed a layer
+            currentZ += layerH;
+            currentLayer++;
+            
+            zDisplay.innerText = currentZ.toFixed(2);
+            layerDisplay.innerText = currentLayer;
+
+        } else {
+             // If cylinder mode failed for some reason, we skip.
+             // But Shape Scan logic above handles "pause" via return, so this block is mostly fallback.
+        }
+    }
+
+    // --- Three.js Dynamic Updates ---
+
+    function initThreeJS() {
+        const container = document.getElementById('canvas3d-container');
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color('#000000'); // Pure Black
+        // Increased Fog distance to allow seeing large objects
+        scene.fog = new THREE.Fog('#000000', 100, 2000); 
+
+        // Increased Camera Far clip to 5000
+        camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 5000);
+        camera.position.set(0, -120, 100);
+        camera.up.set(0, 0, 1);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = false; // Disable auto rotate for manual inspection
+        controls.dampingFactor = 0.1;
+
+        // Dark Lighting
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.4);
+        scene.add(hemi);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, -50, 100);
+        scene.add(dirLight);
+
+        // Bed (Minimalist) - Made grid slightly brighter for visibility
+        gridHelper = new THREE.GridHelper(220, 44, 0x555555, 0x222222); 
+        gridHelper.rotation.x = Math.PI / 2;
+        scene.add(gridHelper);
+        
+        // Nozzle (Small White Dot)
+        const nozzleGeo = new THREE.SphereGeometry(0.8, 16, 16); // Small sphere
+        const nozzleMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Bright white unlit
+        nozzleMesh = new THREE.Mesh(nozzleGeo, nozzleMat);
+        scene.add(nozzleMesh);
+
+        initDynamicGeometry();
+        initBoundsHelper();
+        
+        // Ensure initial fit
+        setTimeout(updateSceneDimensions, 100);
+
+        window.addEventListener('resize', onWindowResize, false);
+        animate();
+    }
+
+    function initBoundsHelper() {
+        // Create Bounding Box Visual
+        const w = parseFloat(document.getElementById('targetWidth').value);
+        const h = parseFloat(document.getElementById('modelHeight').value);
+        
+        const geometry = new THREE.BoxGeometry(w, w, h);
+        // Translate geometry so bottom sits on 0
+        geometry.translate(w/2, w/2, h/2); 
+        
+        const edges = new THREE.EdgesGeometry(geometry);
+        // Made Color Brighter (0x888888) and Opacity Higher (0.5)
+        boundsBox = new THREE.LineSegments(edges, new THREE.LineBasicMaterial( { color: 0x888888, transparent: true, opacity: 0.5, depthTest: false } ));
+        scene.add(boundsBox);
+        
+        // Sync visibility
+        toggleBoundingBox();
+    }
+
+    window.updateSceneDimensions = function() {
+        const w = parseFloat(document.getElementById('targetWidth').value);
+        const h = parseFloat(document.getElementById('modelHeight').value);
+        
+        // 1. Rebuild Bounding Box
+        if(boundsBox) {
+            boundsBox.geometry.dispose();
+            const geometry = new THREE.BoxGeometry(w, w, h);
+            geometry.translate(w/2, w/2, h/2);
+            boundsBox.geometry = new THREE.EdgesGeometry(geometry);
+        }
+        
+        // 2. Update Grid Helper to match base dimension + 20% margin
+        if(gridHelper) {
+            scene.remove(gridHelper);
+            // Size: max of w, or standard min 200. Divisions: every 10mm approx
+            let gridSize = Math.max(w * 1.5, 200);
+            let divisions = Math.floor(gridSize / 10);
+            gridHelper = new THREE.GridHelper(gridSize, divisions, 0x555555, 0x222222);
+            gridHelper.rotation.x = Math.PI / 2;
+            // Grid is centered at 0,0 by default. Move to center of bed.
+            gridHelper.position.set(w/2, w/2, 0);
+            scene.add(gridHelper);
+        }
+
+        // 3. Auto Fit Camera
+        fitView();
+    }
+    
+    window.fitView = function() {
+        if(!camera || !controls) return;
+        const w = parseFloat(document.getElementById('targetWidth').value);
+        const h = parseFloat(document.getElementById('modelHeight').value);
+        
+        const size = Math.max(w, h);
+        const center = new THREE.Vector3(w/2, w/2, h/2); // Center of volume
+        
+        // Calculate distance to fit object
+        const fov = camera.fov * (Math.PI / 180);
+        let dist = Math.abs(size / Math.tan(fov / 2)) * 1.5; // Increased buffer
+        
+        // Clamp min distance to avoid clipping
+        dist = Math.max(dist, 100);
+
+        // Move camera to a nice isometric-ish angle
+        const offset = new THREE.Vector3(0, -dist, dist * 0.6); 
+        
+        camera.position.copy(center).add(offset);
+        controls.target.copy(center);
+        controls.update();
+    }
+
+    window.toggleBoundingBox = function() {
+        if(boundsBox) {
+            boundsBox.visible = document.getElementById('showBounds').checked;
+        }
+    }
+
+    function initDynamicGeometry() {
+        const geometry = new THREE.BufferGeometry();
+        linePositions = new Float32Array(MAX_POINTS * 3);
+        lineColors = new Float32Array(MAX_POINTS * 3);
+        
+        geometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
+        geometry.setDrawRange(0, 0);
+
+        // Brighter Blue for lines against black
+        const material = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2, transparent: true, opacity: 0.9 });
+        livePrintMesh = new THREE.LineSegments(geometry, material);
+        livePrintMesh.frustumCulled = false; 
+        scene.add(livePrintMesh);
+        
+        drawCount = 0;
+    }
+
+    function add3DLine(p1, p2, isExtrude, type = 'wall') {
+        if (drawCount + 2 >= MAX_POINTS) return; 
+
+        if (!isExtrude) return; 
+
+        linePositions[drawCount * 3] = p1.x;
+        linePositions[drawCount * 3 + 1] = p1.y;
+        linePositions[drawCount * 3 + 2] = p1.z;
+        
+        linePositions[drawCount * 3 + 3] = p2.x;
+        linePositions[drawCount * 3 + 4] = p2.y;
+        linePositions[drawCount * 3 + 5] = p2.z;
+
+        // Default Blue: #8ab4f8 -> RGB: 0.54, 0.70, 0.97
+        let col = {r:0.54, g:0.70, b:0.97}; 
+        
+        // Base Color: Greenish #4caf50 -> RGB: 0.30, 0.69, 0.31
+        if (type === 'base') {
+            col = {r:0.30, g:0.69, b:0.31};
+        }
+        
+        for(let i=0; i<2; i++) { 
+            lineColors[(drawCount + i) * 3] = col.r;
+            lineColors[(drawCount + i) * 3 + 1] = col.g;
+            lineColors[(drawCount + i) * 3 + 2] = col.b;
+        }
+
+        drawCount += 2;
+        livePrintMesh.geometry.setDrawRange(0, drawCount);
+        livePrintMesh.geometry.attributes.position.needsUpdate = true;
+        livePrintMesh.geometry.attributes.color.needsUpdate = true;
+    }
+
+    window.resetApp = function() {
+        stopScanning();
+        drawCount = 0;
+        currentZ = 0;
+        currentLayer = 0;
+        gcodeMoves = [];
+        
+        livePrintMesh.geometry.setDrawRange(0, 0);
+        
+        zDisplay.innerText = "0.00";
+        layerDisplay.innerText = "0";
+        
+        totalTimeSeconds = 0;
+        totalFilamentMM = 0;
+        updateStatsUI();
+        
+        document.getElementById('emptyState').style.display = 'flex';
+        nozzleMesh.position.set(0,0,0);
+        baseGenerated = false;
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+        const container = document.getElementById('canvas3d-container');
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    window.exportDxf = function() {
+        if(gcodeMoves.length === 0) return alert("No model generated yet.");
+        
+        let dxfContent = [];
+        
+        // DXF Header
+        dxfContent.push("  0", "SECTION", "  2", "HEADER", "  9", "$ACADVER", "  1", "AC1009", "  0", "ENDSEC");
+        
+        // Entities Section
+        dxfContent.push("  0", "SECTION", "  2", "ENTITIES");
+        
+        let lastPos = {x:0, y:0, z:0};
+        
+        for (let i = 0; i < gcodeMoves.length; i++) {
+            let m = gcodeMoves[i];
+            
+            // Only draw lines for G1 (Extrusion) moves
+            if (m.type === 'G1') {
+                dxfContent.push("  0", "LINE");
+                dxfContent.push("  8", "0"); // Layer 0
+                
+                // Start Point (Previous Position)
+                dxfContent.push(" 10", lastPos.x.toFixed(4));
+                dxfContent.push(" 20", lastPos.y.toFixed(4));
+                dxfContent.push(" 30", lastPos.z.toFixed(4));
+                
+                // End Point (Current Position)
+                dxfContent.push(" 11", m.x.toFixed(4));
+                dxfContent.push(" 21", m.y.toFixed(4));
+                dxfContent.push(" 31", m.z.toFixed(4));
+            }
+            
+            // Update position for next iteration
+            lastPos = {x: m.x, y: m.y, z: m.z};
+        }
+        
+        // Footer
+        dxfContent.push("  0", "ENDSEC", "  0", "EOF");
+        
+        // Create Blob and Download
+        const blob = new Blob([dxfContent.join('\r\n')], {type: "application/dxf"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "vision_scan_model.dxf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    window.exportGcode = function() {
+        if(gcodeMoves.length === 0) return alert("No model generated yet.");
+        
+        let txt = [
+            ";--START GCODE--",
+            ";M104 S220 ; Set Extruder temperature",
+            ";M140 S55 ; Set Heat Bed temperature",
+            ";M190 S55 ; Wait for Heat Bed temperature",
+            ";M109 S220 ; Wait for Extruder temperature",
+            "M140 S60",
+            "M105",
+            "M190 S60",
+            "M104 S200",
+            "M105",
+            "M109 S200",
+            "G28 ; Home all axes",
+            "M117 Purge extruder",
+            "G92 E0 ; Reset Extruder",
+            "G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed",
+            "G1 X0.1 Y20 Z0.3 F5000.0 ; Move to start position",
+            "G1 X0.1 Y200.0 Z0.3 F1500.0 E15 ; Draw the first line",
+            "G1 X0.4 Y200.0 Z0.3 F5000.0 ; Move to side a little",
+            "G1 X0.4 Y20 Z0.3 F1500.0 E30 ; Draw the second line",
+            "G92 E0 ; Reset Extruder",
+            "G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed",
+            "M82 ;absolute extrusion mode",
+            ";--END OF START GCODE--"
+        ];
+
+        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
+        const layerH = parseFloat(document.getElementById('layerHeight').value); 
+        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
+        const flowRatio = parseFloat(document.getElementById('flowRatio').value) || 1.0;
+        
+        // --- NEW EXTRUSION CALCULATION ---
+        // INCREASED LINE WIDTH MULTIPLIER: 1.125 -> 1.25
+        // This creates wider lines for better adhesion
+        const lineWidth = nozzle * 1.25;
+        
+        // Area of filament cross section (pi * r^2)
+        const filamentArea = Math.PI * Math.pow(filDia / 2, 2);
+        // Volumetric flow requirement per mm of movement
+        // Volume = width * height * 1mm
+        // E-step = Volume / filamentArea
+        // Added Flow Ratio multiplier
+        const ePerMM = ((lineWidth * layerH) / filamentArea) * flowRatio;
+        
+        let e = 0;
+        let lastPos = {x:0, y:0};
+        
+        // Retraction Settings
+        const retractDist = 4.0; // mm
+        const retractSpeed = 2400; // mm/min
+        const printSpeed = parseFloat(document.getElementById('printSpeed').value) || 1800; 
+
+        gcodeMoves.forEach((m, index) => {
+            if(m.type === 'G0') {
+                // --- SMART RETRACTION LOGIC ---
+                if (index > 0) {
+                    txt.push(`; Retract`);
+                    txt.push(`G1 F${retractSpeed} E${(e - retractDist).toFixed(5)}`);
+                }
+
+                txt.push(`G0 F3000 X${m.x.toFixed(3)} Y${m.y.toFixed(3)} Z${m.z.toFixed(3)}`);
+
+                if (index > 0) {
+                    txt.push(`; Un-retract`);
+                    txt.push(`G1 F${retractSpeed} E${e.toFixed(5)}`);
+                }
+            } else {
+                let dist = Math.hypot(m.x - lastPos.x, m.y - lastPos.y);
+                e += dist * ePerMM;
+                txt.push(`G1 F${printSpeed} X${m.x.toFixed(3)} Y${m.y.toFixed(3)} Z${m.z.toFixed(3)} E${e.toFixed(5)}`);
+            }
+            lastPos = {x:m.x, y:m.y};
+        });
+        
+        // Add Custom End G-Code
+        txt.push(
+            "",
+            ";--END GCODE--",
+            "G91 ;Relative positioning",
+            "M220 S100 ; Reset Speed factor override percentage to default (100%)",
+            "M221 S100 ; Reset Extrude factor override percentage to default (100%)",
+            "G91 ; Set coordinates to relative",
+            "G1 F1800 E-3 ; Retract filament 3 mm to prevent oozing",
+            "G1 F3000 Z20 ; Move Z Axis up 20 mm to allow filament ooze freely",
+            "G90 ; Set coordinates to absolute",
+            "G1 X0 Y245 F1000 ; Move Heat Bed to the front for easy print removal",
+            "M106 S0 ; Turn off cooling fan",
+            "M104 S0 ; Turn off extruder",
+            "M140 S0 ; Turn off bed",
+            "M107 ; Turn off Fan",
+            "M84 ; Disable stepper motors",
+            ";--END OF END GCODE--"
+        );
+
+        const blob = new Blob([txt.join('\n')], {type: "text/plain"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "vision_lab_print.gcode";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
 </script>
 </body>
-</html> 
+</html>
