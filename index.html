@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>G-Code Generator (Mobile/Desktop)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- OpenCV.js -->
     <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+    <!-- Three.js & OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
@@ -40,40 +42,54 @@
         
         #canvas3d { width: 100%; height: 100%; display: block; outline: none; }
         
-        /* Mobile specific hiding */
-        .mobile-hidden { display: none; }
-        @media (min-width: 768px) {
-            .mobile-hidden { display: flex; }
-            .mobile-only { display: none !important; }
-        }
-
         /* Pulse animation */
         @keyframes pulse-red {
             0% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0.4); }
             70% { box-shadow: 0 0 0 10px rgba(242, 139, 130, 0); }
             100% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0); }
         }
+        
+        /* Glassmorphism for floating UI */
+        .glass-panel {
+            background: rgba(32, 33, 36, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
+    <!-- Loading Screen -->
     <div id="loading" class="loading-overlay">
         <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
         <div class="text-xl font-medium text-gray-300">Vision Engine Initializing...</div>
         <div class="text-sm text-gray-500 mt-2">Loading OpenCV & Three.js</div>
     </div>
 
+    <!-- Hidden File Input for Video Upload -->
     <input type="file" id="videoUploadInput" accept="video/*" class="hidden" onchange="handleVideoUpload(this)">
 
-    <header class="bg-black border-b border-gray-800 h-14 md:h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
+    <!-- Header (Responsive) -->
+    <header class="bg-black border-b border-gray-800 h-14 md:h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-40 relative">
         <div class="flex items-center gap-2 md:gap-3">
             <h1 class="text-lg md:text-xl font-medium text-gray-200">G-Gen <span class="hidden md:inline">Code Generator</span> <span class="text-xs text-gray-500 ml-1 font-mono">BETA</span></h1>
         </div>
-        <div class="flex gap-2">
-            <button onclick="document.getElementById('mobileMenu').classList.toggle('hidden')" class="md:hidden text-gray-300 p-2">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
-            </button>
+        
+        <!-- Controls Area -->
+        <div class="flex items-center gap-2">
+            
+            <!-- Mobile Quick Actions (Icons) -->
+            <div class="flex md:hidden gap-1">
+                <button onclick="document.getElementById('videoUploadInput').click()" class="p-2 text-gray-300 hover:text-white rounded-full active:bg-gray-800" title="Upload Video">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                </button>
+                <button onclick="resetApp()" class="p-2 text-gray-300 hover:text-red-400 rounded-full active:bg-gray-800" title="Reset">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </div>
 
+            <!-- Desktop Controls -->
             <div class="hidden md:flex gap-3">
                 <button id="startCamBtnDesktop" onclick="handleStartCamera()" class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
@@ -93,23 +109,28 @@
         </div>
     </header>
 
-    <div id="mobileMenu" class="hidden absolute top-14 left-0 w-full bg-[#202124] border-b border-gray-700 z-50 p-4 space-y-3 shadow-xl md:hidden">
-        <button id="startCamBtnMobile" onclick="handleStartCamera(); document.getElementById('mobileMenu').classList.add('hidden')" class="w-full bg-[#8ab4f8] text-[#202124] py-3 rounded-lg font-medium flex justify-center items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-            Start Camera
-        </button>
-        <button onclick="document.getElementById('videoUploadInput').click(); document.getElementById('mobileMenu').classList.add('hidden')" class="w-full border border-gray-600 text-gray-200 py-3 rounded-lg font-medium">Upload Video</button>
-        <div class="flex gap-2">
-            <button onclick="resetApp(); document.getElementById('mobileMenu').classList.add('hidden')" class="flex-1 border border-red-900/50 text-red-400 bg-red-900/20 py-3 rounded-lg font-medium">Reset</button>
-            <button onclick="exportGcode(); document.getElementById('mobileMenu').classList.add('hidden')" class="flex-1 bg-[#303134] border border-gray-600 text-white py-3 rounded-lg font-medium">Export</button>
-        </div>
-    </div>
-
-    <div class="flex flex-col md:flex-row flex-1 overflow-hidden relative">
+    <!-- Main Layout Container (Parent of all views) -->
+    <div class="flex flex-col md:flex-row flex-1 overflow-hidden relative w-full h-full">
         
+        <!-- Live Status Overlay (Moved HERE so it floats over EVERYTHING) -->
+        <div id="liveStatus" class="absolute top-4 left-1/2 transform -translate-x-1/2 glass-panel rounded-full px-4 py-2 flex items-center gap-3 hidden z-50 shadow-xl whitespace-nowrap pointer-events-none">
+            <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-[#f28b82] animate-pulse"></div>
+                <span class="text-xs font-bold text-gray-200">SCANNING</span>
+            </div>
+            <div class="h-3 w-px bg-gray-500/50"></div>
+            <div class="text-[10px] text-gray-300 font-mono">
+                Z:<span id="currentZDisplay" class="text-white font-bold ml-1">0.0</span>
+            </div>
+            <div class="h-3 w-px bg-gray-500/50"></div>
+            <div class="text-[10px] text-[#8ab4f8] font-mono" id="estTimeDisplay">00:00</div>
+        </div>
+
+        <!-- View 1: Vision & Settings (Sidebar) -->
         <aside id="sidebarPanel" class="w-full md:w-80 bg-black border-r border-gray-800 flex flex-col overflow-y-auto z-10 absolute md:relative inset-0 md:inset-auto bg-black transition-transform duration-300">
-            <div class="p-4 md:p-5 space-y-4 md:space-y-6 pb-20 md:pb-5">
+            <div class="p-4 md:p-5 space-y-4 md:space-y-6 pb-24 md:pb-5">
                 
+                <!-- Vision Preview Card -->
                 <div class="card p-3 md:p-4 space-y-3">
                     <div class="flex justify-between items-center">
                         <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Vision Feed</h3>
@@ -126,6 +147,7 @@
                         </div>
                     </div>
                     
+                    <!-- Controls -->
                     <div class="space-y-4 pt-2">
                          <div class="flex gap-2">
                              <div class="w-1/2">
@@ -154,8 +176,15 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>START BUILD</span>
                     </button>
+                    
+                    <!-- Mobile only camera start button for convenience -->
+                    <button id="startCamBtnMobile" onclick="handleStartCamera()" class="md:hidden w-full bg-[#8ab4f8] text-[#202124] hover:bg-[#aecbfa] py-3 rounded-lg text-sm font-medium flex justify-center items-center gap-2 mt-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        <span>OPEN CAMERA</span>
+                    </button>
                 </div>
 
+                <!-- Print Settings (Compact Grid) -->
                 <div class="card p-4">
                      <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider mb-3">Printer Params</h3>
                      <div class="grid grid-cols-3 gap-3">
@@ -189,51 +218,49 @@
                         </div>
                      </div>
                      <div class="hidden">
+                        <!-- Hidden inputs for logic continuity -->
                         <input type="number" id="filDia" value="1.75">
                         <input type="number" id="flowRatio" value="1.5">
                         <input type="number" id="scanSpeed" value="100">
                         <input type="checkbox" id="showBounds" checked>
                      </div>
                 </div>
+                
+                <!-- Spacer for mobile scroll -->
+                <div class="h-10 md:hidden"></div>
             </div>
         </aside>
 
-        <main id="mainPanel" class="flex-1 relative bg-black w-full h-full md:block hidden">
+        <!-- View 2: 3D Visualization (Main Panel) -->
+        <main id="mainPanel" class="flex-1 relative bg-black w-full h-full md:block hidden z-0">
             <div id="canvas3d-container" class="absolute inset-0"></div>
             
-            <div id="liveStatus" class="absolute top-6 left-1/2 transform -translate-x-1/2 bg-[#202124]/90 backdrop-blur rounded-full border border-gray-700 px-4 py-2 flex items-center gap-3 hidden z-20 shadow-lg whitespace-nowrap">
-                <div class="flex items-center gap-2">
-                    <div class="w-1.5 h-1.5 rounded-full bg-[#f28b82] animate-pulse"></div>
-                    <span class="text-xs font-bold text-gray-300">REC</span>
-                </div>
-                <div class="h-3 w-px bg-gray-600"></div>
-                <div class="text-[10px] text-gray-400 font-mono">
-                    Z:<span id="currentZDisplay" class="text-white">0.0</span>
-                </div>
-                <div class="h-3 w-px bg-gray-600"></div>
-                <div class="text-[10px] text-[#8ab4f8] font-mono" id="estTimeDisplay">00:00</div>
-                <div class="hidden" id="currentLayerDisplay"></div>
-                <div class="hidden" id="estFilamentDisplay"></div>
-            </div>
-
-            <button onclick="fitView()" class="absolute bottom-24 right-4 md:bottom-6 md:right-6 bg-[#202124] border border-gray-700 p-2 rounded-full text-[#8ab4f8] shadow-lg z-20">
+            <!-- Fit View Button -->
+             <button onclick="fitView()" class="absolute bottom-24 right-4 md:bottom-6 md:right-6 bg-[#202124] border border-gray-700 p-2 rounded-full text-[#8ab4f8] shadow-lg z-20">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
              </button>
             
+            <!-- Empty State -->
             <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
                  <p class="text-sm font-mono opacity-50">3D PREVIEW AREA</p>
             </div>
         </main>
 
-        <div class="md:hidden absolute bottom-0 left-0 w-full h-16 bg-[#202124] border-t border-gray-800 flex justify-around items-center z-30">
-            <button onclick="switchTab('vision')" id="tabVision" class="flex flex-col items-center gap-1 text-[#8ab4f8] w-full h-full justify-center">
+        <!-- Mobile Bottom Tab Bar -->
+        <div class="md:hidden absolute bottom-0 left-0 w-full h-16 bg-[#202124] border-t border-gray-800 flex justify-around items-center z-40">
+            <button onclick="switchTab('vision')" id="tabVision" class="flex flex-col items-center gap-1 text-[#8ab4f8] w-full h-full justify-center transition-colors duration-200">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                <span class="text-[10px] font-medium">Scanner</span>
+                <span class="text-[10px] font-medium tracking-wide">SCANNER</span>
             </button>
             <div class="w-px h-8 bg-gray-700"></div>
-            <button onclick="switchTab('3d')" id="tab3d" class="flex flex-col items-center gap-1 text-gray-500 w-full h-full justify-center">
+            <button onclick="exportGcode()" class="flex flex-col items-center gap-1 text-green-400 w-full h-full justify-center active:bg-gray-800 transition-colors duration-200">
+                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                 <span class="text-[10px] font-medium tracking-wide">EXPORT</span>
+            </button>
+            <div class="w-px h-8 bg-gray-700"></div>
+            <button onclick="switchTab('3d')" id="tab3d" class="flex flex-col items-center gap-1 text-gray-500 w-full h-full justify-center transition-colors duration-200">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                <span class="text-[10px] font-medium">3D View</span>
+                <span class="text-[10px] font-medium tracking-wide">3D VIEW</span>
             </button>
         </div>
     </div>
@@ -323,7 +350,9 @@
         document.getElementById('loading').style.display = 'none';
         cvReady = true;
         // Enable buttons
-        document.getElementById('startCamBtnDesktop').disabled = false;
+        if(document.getElementById('startCamBtnDesktop')) {
+            document.getElementById('startCamBtnDesktop').disabled = false;
+        }
         initThreeJS();
     }
 
@@ -358,8 +387,10 @@
                 setTimeout(() => {
                     if(!streaming) return;
                     initCvObjects();
-                    // Auto-switch to vision tab on upload
-                    if(window.innerWidth < 768) switchTab('vision');
+                    // Auto-switch to vision tab on upload so user sees the "Scanning" process
+                    if(window.innerWidth < 768) {
+                        switchTab('vision');
+                    }
                     // Auto start scanning logic
                     startScanning();
                 }, 500); 
@@ -375,7 +406,6 @@
     }
 
     function startCamera() {
-        // Updated constraints for mobile rear camera support
         const constraints = {
             audio: false,
             video: {
@@ -412,18 +442,27 @@
     }
 
     function updateStartButtons(isRecording) {
-        const text = isRecording ? "Stop" : "Camera";
-        const colorClassAdd = isRecording ? "bg-red-400" : "bg-[#8ab4f8]";
-        const colorClassRem = isRecording ? "bg-[#8ab4f8]" : "bg-red-400";
-        
         const deskBtn = document.getElementById('startCamBtnDesktop');
         const mobBtn = document.getElementById('startCamBtnMobile');
         
         if(deskBtn) {
             deskBtn.innerHTML = isRecording ? `Stop` : `<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Camera`;
-            deskBtn.classList.remove(colorClassRem); // Simplified class toggling logic
+            if(isRecording) {
+                 deskBtn.classList.replace('bg-[#8ab4f8]', 'bg-red-400');
+            } else {
+                 deskBtn.classList.replace('bg-red-400', 'bg-[#8ab4f8]');
+            }
         }
-        if(mobBtn) mobBtn.innerText = isRecording ? "Stop Camera" : "Start Camera";
+        if(mobBtn) {
+            mobBtn.innerHTML = isRecording ? `<span>STOP CAMERA</span>` : `<span>OPEN CAMERA</span>`;
+            if(isRecording) {
+                 mobBtn.classList.replace('bg-[#8ab4f8]', 'bg-red-500');
+                 mobBtn.classList.replace('text-[#202124]', 'text-white');
+            } else {
+                 mobBtn.classList.replace('bg-red-500', 'bg-[#8ab4f8]');
+                 mobBtn.classList.replace('text-white', 'text-[#202124]');
+            }
+        }
     }
 
     function stopInput() {
@@ -540,14 +579,9 @@
         toggleScanBtn.classList.add('border-[#f28b82]', 'text-[#f28b82]');
         toggleScanBtn.classList.remove('border-gray-600', 'text-[#8ab4f8]');
         
+        // Show live status overlay (Now it's global so it works on any tab)
         liveStatus.style.display = 'flex';
         document.getElementById('emptyState').style.display = 'none';
-
-        // Auto Switch to 3D tab on mobile when scan starts to see result
-        if(window.innerWidth < 768 && !isVideoFile) {
-            // For live camera, user probably wants to see camera, so don't switch automatically
-            // But for video file upload, maybe switch? Let's leave it manual for now.
-        }
 
         let speed = parseInt(document.getElementById('scanSpeed').value);
         scanIntervalId = setInterval(processOneLayer, speed);
@@ -923,6 +957,7 @@
         document.getElementById('emptyState').style.display = 'flex';
         nozzleMesh.position.set(0,0,0);
         lastValidPolygon = null;
+        liveStatus.style.display = 'none'; // Hide overlay on reset
     }
 
     function animate() {
