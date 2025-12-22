@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>G-Code Generator - Smart Scan</title>
+    <title>Live G-Code Vision Scanner (Dark Lab)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- OpenCV.js -->
     <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
@@ -56,11 +56,6 @@
             70% { box-shadow: 0 0 0 10px rgba(242, 139, 130, 0); }
             100% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0); }
         }
-        @keyframes pulse-yellow {
-            0% { box-shadow: 0 0 0 0 rgba(253, 214, 99, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(253, 214, 99, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(253, 214, 99, 0); }
-        }
         .recording-pulse { animation: pulse-red 2s infinite; }
     </style>
 </head>
@@ -78,7 +73,7 @@
     <!-- Header -->
     <header class="bg-black border-b border-gray-800 h-16 flex items-center justify-between px-6 shrink-0 z-10">
         <div class="flex items-center gap-3">
-            <h1 class="text-xl font-medium text-gray-200">G-code Generator <span class="text-xs text-gray-500 ml-2 font-mono">SMART-SCAN</span></h1>
+            <h1 class="text-xl font-medium text-gray-200">G-code Generator <span class="text-xs text-gray-500 ml-2 font-mono">BETA</span></h1>
         </div>
         <div class="flex gap-3">
             <!-- Source Controls -->
@@ -139,14 +134,14 @@
                                 <span>GENERATION MODE</span>
                             </div>
                             <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded p-2 text-sm focus:border-[#8ab4f8] outline-none">
-                                <option value="SHAPE" selected>Shape Scan (Precise)</option>
                                 <option value="CYLINDER">Cylinder Texture (Vase)</option>
+                                <option value="SHAPE">Shape Scan (Legacy)</option>
                             </select>
                         </div>
 
                         <div>
                             <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
-                                <span>TEXTURE INTENSITY (VASE)</span>
+                                <span>TEXTURE INTENSITY</span>
                                 <span id="val-tex" class="text-gray-300">5.0</span>
                             </div>
                             <input type="range" id="textureDepth" min="0" max="10" step="0.1" value="5.0">
@@ -179,16 +174,10 @@
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18M3 21h18M12 8v8m-4-4h8"></path></svg>
                             </button>
                         </div>
-                        <div class="flex gap-3">
-                            <label class="flex items-center gap-1.5 text-[10px] text-gray-300 cursor-pointer select-none">
-                                <input type="checkbox" id="genBase" checked class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
-                                Gen Base
-                            </label>
-                            <label class="flex items-center gap-1.5 text-[10px] text-gray-400 cursor-pointer select-none">
-                                <input type="checkbox" id="showBounds" checked onchange="toggleBoundingBox()" class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
-                                Box
-                            </label>
-                        </div>
+                        <label class="flex items-center gap-2 text-[10px] text-gray-400 cursor-pointer">
+                            <input type="checkbox" id="showBounds" checked onchange="toggleBoundingBox()">
+                            Show Box
+                        </label>
                     </div>
                     
                     <div class="grid grid-cols-2 gap-3">
@@ -219,10 +208,12 @@
                         </div>
                         <div class="space-y-1">
                             <label class="text-[10px] text-gray-500 uppercase font-mono">Flow Ratio</label>
+                            <!-- Increased default Flow Ratio to 1.5 to fix under-extrusion -->
                             <input type="number" id="flowRatio" value="1.5" step="0.1" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
                         </div>
                         <div class="space-y-1">
                             <label class="text-[10px] text-gray-500 uppercase font-mono">Print Speed (F)</label>
+                            <!-- Lowered default Print Speed to 1200 for better melting -->
                             <input type="number" id="printSpeed" value="1200" step="100" class="w-full bg-[#303134] border border-gray-600 rounded px-2 py-1 text-sm font-mono focus:border-[#8ab4f8] transition-colors">
                         </div>
                         <div class="space-y-1">
@@ -242,8 +233,8 @@
             <!-- Live Status Overlay -->
             <div id="liveStatus" class="absolute top-6 left-1/2 transform -translate-x-1/2 bg-[#202124]/90 backdrop-blur rounded-full border border-gray-700 px-6 py-2 flex items-center gap-4 hidden z-20">
                 <div class="flex items-center gap-2">
-                    <div id="statusDot" class="w-2 h-2 rounded-full bg-[#f28b82]"></div>
-                    <span id="statusText" class="text-xs font-bold text-gray-300 tracking-wide">BUILDING</span>
+                    <div class="w-1.5 h-1.5 rounded-full bg-[#f28b82] animate-pulse"></div>
+                    <span class="text-xs font-bold text-gray-300 tracking-wide">BUILDING</span>
                 </div>
                 <div class="h-3 w-px bg-gray-600"></div>
                 <div class="text-[10px] text-gray-400 font-mono flex gap-3">
@@ -260,8 +251,11 @@
                 </div>
             </div>
             
-            <!-- Empty State (CLEARED CONTENT) -->
+            <!-- Empty State -->
             <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
+                <div class="w-px h-16 bg-gradient-to-b from-transparent via-gray-700 to-transparent mb-4"></div>
+                <p class="text-xs uppercase tracking-[0.2em] font-mono">System Ready</p>
+                <p class="text-[10px] opacity-40 mt-2 font-mono">Initialize Vision Feed to Begin</p>
             </div>
         </main>
     </div>
@@ -281,8 +275,10 @@
     let scanIntervalId = null;
     let currentZ = 0;
     let currentLayer = 0;
+    let consecutiveEmptyLayers = 0; 
+    const EMPTY_LAYER_THRESHOLD = 50; 
     let gcodeMoves = []; 
-    let baseGenerated = false; // Flag to track if base has been generated
+    let lastValidPolygon = null; 
     
     // Estimates
     let totalTimeSeconds = 0;
@@ -315,12 +311,9 @@
     const liveStatus = document.getElementById('liveStatus');
     const zDisplay = document.getElementById('currentZDisplay');
     const layerDisplay = document.getElementById('currentLayerDisplay');
+    const gcodeCountDisplay = document.getElementById('gcodeCountDisplay'); // Removed, replaced by Time/Filament
     const estTimeDisplay = document.getElementById('estTimeDisplay');
     const estFilamentDisplay = document.getElementById('estFilamentDisplay');
-    
-    // Status Indicators
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
 
     // --- Initialization ---
 
@@ -416,7 +409,7 @@
         if(stream) { stream.getTracks().forEach(track => track.stop()); stream = null; video.srcObject = null; }
         if(video.src) { URL.revokeObjectURL(video.src); video.src = ""; }
         
-        // SAFE CLEANUP
+        // SAFE CLEANUP: Use try-catch blocks and ensure delete exists
         if(src) { try{src.delete();}catch(e){} src = null; }
         if(dst) { try{dst.delete();}catch(e){} dst = null; }
         if(contours) { try{contours.delete();}catch(e){} contours = null; }
@@ -493,159 +486,40 @@
     function startScanning() {
         if(!streaming) return alert("Please start camera source first.");
         
-        // --- VIDEO REPLAY & RESET ---
         if(isVideoFile) {
             if (video.paused || video.ended) {
                 video.currentTime = 0;
                 video.play();
-                // Reset logic handled below
+                
+                currentZ = 0;
+                currentLayer = 0;
+                consecutiveEmptyLayers = 0;
+                lastValidPolygon = null;
+                gcodeMoves = [];
+                drawCount = 0;
+                totalTimeSeconds = 0;
+                totalFilamentMM = 0;
+                
+                if(livePrintMesh) livePrintMesh.geometry.setDrawRange(0, 0);
+                zDisplay.innerText = "0.00";
+                layerDisplay.innerText = "0";
+                updateStatsUI();
+                
+                nozzleMesh.position.set(0,0,0);
             }
         }
         
-        // Reset State
         isScanning = true;
-        baseGenerated = false; // Reset base generation flag
-        gcodeMoves = [];
-        drawCount = 0;
-        totalTimeSeconds = 0;
-        totalFilamentMM = 0;
-        currentZ = 0;
-        currentLayer = 0;
-        
-        if(livePrintMesh) livePrintMesh.geometry.setDrawRange(0, 0);
-        zDisplay.innerText = "0.00";
-        layerDisplay.innerText = "0";
-        updateStatsUI();
-        nozzleMesh.position.set(0,0,0);
-
+        consecutiveEmptyLayers = 0;
         toggleScanBtn.innerHTML = `<span>STOP BUILD</span>`;
         toggleScanBtn.classList.add('border-[#f28b82]', 'text-[#f28b82]');
         toggleScanBtn.classList.remove('border-gray-600', 'text-[#8ab4f8]');
         
         liveStatus.style.display = 'flex';
-        updateStatus("BUILDING", "#f28b82", "pulse-red");
-        
         document.getElementById('emptyState').style.display = 'none';
 
         let speed = parseInt(document.getElementById('scanSpeed').value);
         scanIntervalId = setInterval(processOneLayer, speed);
-    }
-
-    function updateStatus(text, colorHex, animClass) {
-        statusText.innerText = text;
-        statusDot.style.backgroundColor = colorHex;
-        if (animClass) {
-            statusDot.className = `w-2 h-2 rounded-full ${animClass}`;
-        } else {
-            statusDot.className = `w-2 h-2 rounded-full`;
-        }
-    }
-
-    // NEW: Generate Base from a polygon shape using SCANLINE fill (0 and 90 degrees)
-    function generateBaseFromPoly(polygon) {
-        const bedSize = parseFloat(document.getElementById('targetWidth').value);
-        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
-        const layerH = parseFloat(document.getElementById('layerHeight').value);
-        const baseLayers = 3; 
-        
-        const spacing = nozzle * 1.25; // Line spacing for fill
-        
-        // Get bounding box of polygon for scanning
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        polygon.forEach(p => {
-            if(p.x < minX) minX = p.x; if(p.x > maxX) maxX = p.x;
-            if(p.y < minY) minY = p.y; if(p.y > maxY) maxY = p.y;
-        });
-
-        console.log("Generating Rectilinear Base from Shape...");
-        let baseMoves = [];
-
-        // --- Helper: Intersect Scanline ---
-        // Returns list of intersection points (x for horizontal scan, y for vertical)
-        function getIntersections(val, isHorizontal) {
-            let intersections = [];
-            for (let i = 0; i < polygon.length; i++) {
-                let p1 = polygon[i];
-                let p2 = polygon[(i + 1) % polygon.length];
-                
-                let v1 = isHorizontal ? p1.y : p1.x;
-                let v2 = isHorizontal ? p2.y : p2.x;
-                
-                // Check if scanline crosses edge
-                if (((v1 <= val) && (v2 > val)) || ((v1 > val) && (v2 <= val))) {
-                    // Calc intersect
-                    let t = (val - v1) / (v2 - v1);
-                    let intVal = isHorizontal 
-                        ? p1.x + t * (p2.x - p1.x)
-                        : p1.y + t * (p2.y - p1.y);
-                    intersections.push(intVal);
-                }
-            }
-            return intersections.sort((a, b) => a - b);
-        }
-
-        // --- Generate Layers ---
-        for(let l=1; l<=baseLayers; l++) {
-            let z = l * layerH;
-            
-            // 1. Draw Perimeters (1 shell)
-            if(polygon.length > 0) {
-                // Travel to start
-                baseMoves.push({ type: 'G0', x: polygon[0].x, y: polygon[0].y, z: z });
-                // Extrude Loop
-                for(let i=1; i<polygon.length; i++) {
-                    baseMoves.push({ type: 'G1', x: polygon[i].x, y: polygon[i].y, z: z });
-                    add3DLine(polygon[i-1], polygon[i], true, 'base');
-                }
-                // Close
-                baseMoves.push({ type: 'G1', x: polygon[0].x, y: polygon[0].y, z: z });
-                add3DLine(polygon[polygon.length-1], polygon[0], true, 'base');
-            }
-
-            // 2. Generate Infill
-            // Layer 1 & 3: Horizontal (0 deg)
-            // Layer 2: Vertical (90 deg)
-            let isHorizontal = (l % 2 !== 0); 
-            
-            let startVal = isHorizontal ? minY : minX;
-            let endVal = isHorizontal ? maxY : maxX;
-            
-            // Inset slightly to not overlap perimeter
-            startVal += spacing;
-            endVal -= spacing;
-
-            for (let val = startVal; val <= endVal; val += spacing) {
-                let intersects = getIntersections(val, isHorizontal);
-                
-                // Draw segments between pairs
-                for (let i = 0; i < intersects.length - 1; i += 2) {
-                    let pStart, pEnd;
-                    
-                    if (isHorizontal) {
-                        pStart = { x: intersects[i], y: val };
-                        pEnd = { x: intersects[i+1], y: val };
-                    } else {
-                        pStart = { x: val, y: intersects[i] };
-                        pEnd = { x: val, y: intersects[i+1] };
-                    }
-                    
-                    baseMoves.push({ type: 'G0', x: pStart.x, y: pStart.y, z: z });
-                    baseMoves.push({ type: 'G1', x: pEnd.x, y: pEnd.y, z: z });
-                    add3DLine(pStart, pEnd, true, 'base');
-                }
-            }
-            
-            currentZ = z;
-            currentLayer = l;
-        }
-        
-        gcodeMoves.push(...baseMoves);
-        updateEstimates(baseMoves);
-        zDisplay.innerText = currentZ.toFixed(2);
-        layerDisplay.innerText = currentLayer;
-        
-        // Prepare Z for next live layer (Layer 4)
-        currentZ += layerH;
     }
 
     function stopScanning() {
@@ -664,26 +538,30 @@
     }
 
     function updateEstimates(newMoves) {
+        // Calculate extrusion and time for the new layer moves
         const nozzle = parseFloat(document.getElementById('nozzleDia').value);
         const layerH = parseFloat(document.getElementById('layerHeight').value); 
         const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
         const flowRatio = parseFloat(document.getElementById('flowRatio').value) || 1.0;
-        const printSpeedMin = parseFloat(document.getElementById('printSpeed').value) || 1800; 
-        const printSpeedSec = printSpeedMin / 60; 
+        const printSpeedMin = parseFloat(document.getElementById('printSpeed').value) || 1800; // mm/min
+        const printSpeedSec = printSpeedMin / 60; // mm/s
         
-        const travelSpeedMin = 3000; 
+        const travelSpeedMin = 3000; // Hardcoded travel
         const travelSpeedSec = travelSpeedMin / 60;
         
         const retractDist = 4.0;
         const retractSpeedMin = 2400;
-        const retractTime = (retractDist / (retractSpeedMin / 60)) * 2; 
+        const retractTime = (retractDist / (retractSpeedMin / 60)) * 2; // Retract + Unretract time (s)
 
+        // Extrusion calc
         const lineWidth = nozzle * 1.25;
         const filamentArea = Math.PI * Math.pow(filDia / 2, 2);
         const ePerMM = ((lineWidth * layerH) / filamentArea) * flowRatio;
 
         let lastPos = null;
+        // Find last pos from previous gcodeMoves or 0,0,0
         if(gcodeMoves.length > newMoves.length) {
+             // get the one before the new batch
              let prevMove = gcodeMoves[gcodeMoves.length - newMoves.length - 1];
              lastPos = { x: prevMove.x, y: prevMove.y, z: prevMove.z };
         } else {
@@ -694,9 +572,12 @@
             let dist = Math.hypot(m.x - lastPos.x, m.y - lastPos.y);
             
             if(m.type === 'G0') {
+                // Travel move
                 totalTimeSeconds += (dist / travelSpeedSec);
+                // Add retraction time heuristic for significant travels
                 if(dist > 2.0) totalTimeSeconds += retractTime;
             } else {
+                // Print move
                 totalTimeSeconds += (dist / printSpeedSec);
                 totalFilamentMM += (dist * ePerMM);
             }
@@ -707,6 +588,7 @@
     }
 
     function updateStatsUI() {
+        // Format Time
         let h = Math.floor(totalTimeSeconds / 3600);
         let m = Math.floor((totalTimeSeconds % 3600) / 60);
         let s = Math.floor(totalTimeSeconds % 60);
@@ -716,8 +598,12 @@
         timeStr += `${m}m ${s}s`;
         estTimeDisplay.innerText = timeStr;
 
+        // Format Filament
+        // Length in meters
         let meters = (totalFilamentMM / 1000).toFixed(2);
         
+        // Weight in grams (PLA ~ 1.24 g/cm3)
+        // Volume (mm3) = Length(mm) * Area(mm2)
         const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
         const area = Math.PI * Math.pow(filDia/2, 2);
         const volumeCM3 = (totalFilamentMM * area) / 1000;
@@ -748,9 +634,12 @@
         if (mode === 'CYLINDER') {
             const numSegments = 72; 
             const maxRadius = bedSize / 2; 
+            
             const safetyMargin = 10.0;
             const absoluteMaxRadius = Math.max(5, maxRadius - safetyMargin); 
+
             const baseRadius = Math.max(10, maxRadius - 50.0); 
+            
             const center = { x: video.width / 2, y: video.height / 2 };
             let radii = new Array(numSegments).fill(0); 
             
@@ -799,6 +688,7 @@
             for (let i = 0; i <= numSegments; i++) {
                 let idx = i % numSegments;
                 let angle = (i / numSegments) * Math.PI * 2;
+                
                 let r = baseRadius + layerThicknessOffset + (radii[idx] * textureFactor * 5.0); 
                 
                 if (r > absoluteMaxRadius) r = absoluteMaxRadius;
@@ -809,7 +699,7 @@
                 layerPoints.push({ x: finalX, y: finalY });
             }
         } 
-        // --- MODE 2: SHAPE SCAN (PRECISE) ---
+        // --- MODE 2: SHAPE SCAN (LEGACY) ---
         else {
              let bestPoly = null;
              let maxArea = 0;
@@ -836,23 +726,19 @@
                 }
             }
             
-            // --- CRITICAL FIX: SMART PAUSE LOGIC ---
-            // If no shape is found in this frame, we STOP incrementing Z.
-            // We do NOT use the old polygon. We wait for a new valid image.
-            if (!bestPoly) {
-                // UI Feedback: Waiting
-                updateStatus("WAITING SIGNAL", "#fdd663", "pulse-yellow");
-                // Return immediately without printing or moving Z up
-                return; 
-            } else {
-                // Restore Status
-                updateStatus("BUILDING", "#f28b82", "pulse-red");
+            if (!bestPoly && lastValidPolygon && consecutiveEmptyLayers < EMPTY_LAYER_THRESHOLD) {
+                bestPoly = lastValidPolygon;
             }
 
             if (bestPoly) {
+                lastValidPolygon = bestPoly; 
+                consecutiveEmptyLayers = 0; 
+
                 let scaleFactor = bedSize / video.videoWidth; 
                 const centerX = bedSize / 2;
                 const centerY = (video.videoHeight * scaleFactor) / 2; 
+                const offsetCenterY = bedSize / 2; 
+
                 const maxR = (bedSize / 2) - 5; 
                 
                 let transformedPoly = bestPoly.map(p => {
@@ -887,13 +773,7 @@
         const isEmpty = layerPoints.length === 0;
 
         if (!isEmpty || mode === 'CYLINDER') {
-            // --- BASE GENERATION TRIGGER ---
-            if(document.getElementById('genBase').checked && !baseGenerated) {
-                generateBaseFromPoly(layerPoints);
-                baseGenerated = true;
-            }
-            
-            // --- NORMAL WALL GENERATION ---
+            consecutiveEmptyLayers = 0;
 
             let layerMoves = [];
             
@@ -907,12 +787,13 @@
                     add3DLine(
                         {x:layerPoints[i-1].x, y:layerPoints[i-1].y, z:currentZ}, 
                         {x:p.x, y:p.y, z:currentZ}, 
-                        true, 'wall'
+                        true
                     );
                 }
             }
 
             gcodeMoves.push(...layerMoves);
+            // Calculate Stats Immediately
             updateEstimates(layerMoves);
             
             if(layerMoves.length > 0) {
@@ -920,7 +801,6 @@
                 nozzleMesh.position.set(last.x, last.y, last.z);
             }
             
-            // Only increment Z if we actually successfully processed a layer
             currentZ += layerH;
             currentLayer++;
             
@@ -928,8 +808,11 @@
             layerDisplay.innerText = currentLayer;
 
         } else {
-             // If cylinder mode failed for some reason, we skip.
-             // But Shape Scan logic above handles "pause" via return, so this block is mostly fallback.
+            consecutiveEmptyLayers++;
+            if(consecutiveEmptyLayers > EMPTY_LAYER_THRESHOLD) {
+                console.log("Auto-stopping");
+                stopScanning();
+            }
         }
     }
 
@@ -1079,7 +962,7 @@
         drawCount = 0;
     }
 
-    function add3DLine(p1, p2, isExtrude, type = 'wall') {
+    function add3DLine(p1, p2, isExtrude) {
         if (drawCount + 2 >= MAX_POINTS) return; 
 
         if (!isExtrude) return; 
@@ -1092,13 +975,8 @@
         linePositions[drawCount * 3 + 4] = p2.y;
         linePositions[drawCount * 3 + 5] = p2.z;
 
-        // Default Blue: #8ab4f8 -> RGB: 0.54, 0.70, 0.97
-        let col = {r:0.54, g:0.70, b:0.97}; 
-        
-        // Base Color: Greenish #4caf50 -> RGB: 0.30, 0.69, 0.31
-        if (type === 'base') {
-            col = {r:0.30, g:0.69, b:0.31};
-        }
+        // Google Blue: #8ab4f8 -> RGB: 0.54, 0.70, 0.97
+        const col = {r:0.54, g:0.70, b:0.97}; 
         
         for(let i=0; i<2; i++) { 
             lineColors[(drawCount + i) * 3] = col.r;
@@ -1130,7 +1008,7 @@
         
         document.getElementById('emptyState').style.display = 'flex';
         nozzleMesh.position.set(0,0,0);
-        baseGenerated = false;
+        lastValidPolygon = null;
     }
 
     function animate() {
