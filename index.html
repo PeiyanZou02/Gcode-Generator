@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live G-Code Vision Scanner (Dark Lab)</title>
+    <title>G-Code Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- OpenCV.js -->
     <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
@@ -255,11 +255,8 @@
                 </div>
             </div>
             
-            <!-- Empty State -->
+            <!-- Empty State (CLEARED CONTENT) -->
             <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
-                <div class="w-px h-16 bg-gradient-to-b from-transparent via-gray-700 to-transparent mb-4"></div>
-                <p class="text-xs uppercase tracking-[0.2em] font-mono">System Ready</p>
-                <p class="text-[10px] opacity-40 mt-2 font-mono">Initialize Vision Feed to Begin</p>
             </div>
         </main>
     </div>
@@ -531,75 +528,106 @@
         scanIntervalId = setInterval(processOneLayer, speed);
     }
 
-    // NEW: Generate Base from a polygon shape (concentric fill)
+    // NEW: Generate Base from a polygon shape using SCANLINE fill (0 and 90 degrees)
     function generateBaseFromPoly(polygon) {
         const bedSize = parseFloat(document.getElementById('targetWidth').value);
         const nozzle = parseFloat(document.getElementById('nozzleDia').value);
         const layerH = parseFloat(document.getElementById('layerHeight').value);
-        const baseLayers = 3; // Standard 3 solid layers
+        const baseLayers = 3; 
         
-        // Use simplified center logic: bed center
-        const center = { x: bedSize/2, y: bedSize/2 };
+        const spacing = nozzle * 1.25; // Line spacing for fill
         
-        // Spacing for concentric fill
-        const spacing = nozzle * 1.125; 
-        
-        // Calculate approx radius of the polygon to know how many loops
-        // Simple bounding box of poly
+        // Get bounding box of polygon for scanning
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         polygon.forEach(p => {
             if(p.x < minX) minX = p.x; if(p.x > maxX) maxX = p.x;
             if(p.y < minY) minY = p.y; if(p.y > maxY) maxY = p.y;
         });
-        const radiusApprox = Math.max((maxX - minX)/2, (maxY - minY)/2);
-        
-        console.log("Generating Base from Shape... Radius Approx: " + radiusApprox);
+
+        console.log("Generating Rectilinear Base from Shape...");
         let baseMoves = [];
 
-        // For each base layer
+        // --- Helper: Intersect Scanline ---
+        // Returns list of intersection points (x for horizontal scan, y for vertical)
+        function getIntersections(val, isHorizontal) {
+            let intersections = [];
+            for (let i = 0; i < polygon.length; i++) {
+                let p1 = polygon[i];
+                let p2 = polygon[(i + 1) % polygon.length];
+                
+                let v1 = isHorizontal ? p1.y : p1.x;
+                let v2 = isHorizontal ? p2.y : p2.x;
+                
+                // Check if scanline crosses edge
+                if (((v1 <= val) && (v2 > val)) || ((v1 > val) && (v2 <= val))) {
+                    // Calc intersect
+                    let t = (val - v1) / (v2 - v1);
+                    let intVal = isHorizontal 
+                        ? p1.x + t * (p2.x - p1.x)
+                        : p1.y + t * (p2.y - p1.y);
+                    intersections.push(intVal);
+                }
+            }
+            return intersections.sort((a, b) => a - b);
+        }
+
+        // --- Generate Layers ---
         for(let l=1; l<=baseLayers; l++) {
             let z = l * layerH;
             
-            // Generate Concentric Loops
-            // We simulate offsets by scaling the polygon towards center
-            // Loop from scale 0 to 1
-            
-            // Calculate step size in scale units (approx)
-            // If radius is 50mm, spacing 0.5mm, we need 100 steps. 
-            // Step size = 1 / 100 = spacing / radius
-            // CLAMP Scale Step to prevent infinite loops on tiny geometry
-            const scaleStep = Math.min(1.0, Math.max(0.01, spacing / radiusApprox)); 
-            
-            // Start from near center (small scale) to outer (scale 1)
-            for(let s=scaleStep; s<=1.0; s+=scaleStep) {
+            // 1. Draw Perimeters (2 shells)
+            // Simulating shells by drawing polygon twice. 
+            // Note: Simple repetition without offset isn't ideal but fits constraints.
+            // First loop (Outer)
+            if(polygon.length > 0) {
+                // Travel to start
+                baseMoves.push({ type: 'G0', x: polygon[0].x, y: polygon[0].y, z: z });
+                // Extrude Loop
+                for(let i=1; i<polygon.length; i++) {
+                    baseMoves.push({ type: 'G1', x: polygon[i].x, y: polygon[i].y, z: z });
+                    add3DLine(polygon[i-1], polygon[i], true, 'base');
+                }
+                // Close
+                baseMoves.push({ type: 'G1', x: polygon[0].x, y: polygon[0].y, z: z });
+                add3DLine(polygon[polygon.length-1], polygon[0], true, 'base');
                 
-                // Generate ring points based on scale 's'
-                let ringPoints = polygon.map(p => {
-                    // Linear interpolation towards center
-                    return {
-                        x: center.x + (p.x - center.x) * s,
-                        y: center.y + (p.y - center.y) * s
-                    };
-                });
+                // Second loop (Inner - approximation: same path, maybe slight offset logic could go here)
+                // Just repeating for wall strength in this simplified context
+                // ... skipped for now to avoid messiness, single shell + infill is safer
+            }
+
+            // 2. Generate Infill
+            // Layer 1 & 3: Horizontal (0 deg)
+            // Layer 2: Vertical (90 deg)
+            let isHorizontal = (l % 2 !== 0); 
+            
+            let startVal = isHorizontal ? minY : minX;
+            let endVal = isHorizontal ? maxY : maxX;
+            
+            // Inset slightly to not overlap perimeter
+            startVal += spacing;
+            endVal -= spacing;
+
+            for (let val = startVal; val <= endVal; val += spacing) {
+                let intersects = getIntersections(val, isHorizontal);
                 
-                // Add moves for this ring
-                if(ringPoints.length > 0) {
-                    // Travel to start of ring
-                    baseMoves.push({ type: 'G0', x: ringPoints[0].x, y: ringPoints[0].y, z: z });
+                // Draw segments between pairs
+                for (let i = 0; i < intersects.length - 1; i += 2) {
+                    let pStart, pEnd;
                     
-                    // Extrude ring
-                    for(let i=1; i<ringPoints.length; i++) {
-                        let p = ringPoints[i];
-                        let prev = ringPoints[i-1];
-                        baseMoves.push({ type: 'G1', x: p.x, y: p.y, z: z });
-                        // Visualize in Base Color (Greenish/Yellowish)
-                        add3DLine(prev, p, true, 'base'); 
+                    if (isHorizontal) {
+                        pStart = { x: intersects[i], y: val };
+                        pEnd = { x: intersects[i+1], y: val };
+                    } else {
+                        pStart = { x: val, y: intersects[i] };
+                        pEnd = { x: val, y: intersects[i+1] };
                     }
-                    // Close loop
-                    let first = ringPoints[0];
-                    let last = ringPoints[ringPoints.length-1];
-                    baseMoves.push({ type: 'G1', x: first.x, y: first.y, z: z });
-                    add3DLine(last, first, true, 'base');
+                    
+                    // Optimization: Travel to closest point
+                    // Here simple logic: Travel to Start, Extrude to End
+                    baseMoves.push({ type: 'G0', x: pStart.x, y: pStart.y, z: z });
+                    baseMoves.push({ type: 'G1', x: pEnd.x, y: pEnd.y, z: z });
+                    add3DLine(pStart, pEnd, true, 'base');
                 }
             }
             
