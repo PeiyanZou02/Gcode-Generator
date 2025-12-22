@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>G-Code Generator (Mobile/Desktop)</title>
+    <title>G-Code Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- OpenCV.js -->
     <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
@@ -15,284 +15,233 @@
     
     <style>
         /* Dark Mode Global */
-        body { font-family: 'Roboto', sans-serif; background-color: #000000; color: #e8eaed; overflow: hidden; overscroll-behavior: none; }
+        body { font-family: 'Roboto', sans-serif; background-color: #000000; color: #e8eaed; overflow: hidden; }
         h1, h2, h3, button { font-family: 'Google Sans', sans-serif; }
         
         /* Dark Material Card */
         .card { background: #202124; border: 1px solid #3c4043; border-radius: 12px; }
         
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; background: #000; }
+        /* Custom Scrollbar Dark */
+        ::-webkit-scrollbar { width: 4px; height: 4px; background: #000; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #5f6368; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #80868b; }
 
         /* Canvas Styles */
         #videoInput { display: none; }
         canvas.vision-canvas { width: 100%; height: auto; border-radius: 8px; background: #000; border: 1px solid #3c4043; }
         
-        /* Inputs */
+        /* Dark Range Slider */
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #8ab4f8; margin-top: -6px; cursor: pointer; border: 2px solid #202124; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #5f6368; border-radius: 2px; }
         
-        input[type=number], select { background-color: #303134; color: #e8eaed; border: 1px solid #5f6368; }
-        input[type=number]:focus, select:focus { border-color: #8ab4f8; outline: none; }
+        /* Inputs Dark */
+        input[type=number] { background-color: #303134; color: #e8eaed; border: 1px solid #5f6368; }
+        input[type=number]:focus { border-color: #8ab4f8; outline: none; }
         
+        /* Select Dark */
+        select { background-color: #303134; color: #e8eaed; border: 1px solid #5f6368; border-radius: 4px; padding: 2px 4px; font-size: 0.875rem; }
+        
+        /* Checkbox */
+        input[type="checkbox"] { accent-color: #8ab4f8; }
+
         .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; display: flex; justify-content: center; align-items: center; z-index: 100; flex-direction: column; }
         
         #canvas3d { width: 100%; height: 100%; display: block; outline: none; }
         
-        /* Pulse animation */
+        /* Pulse animation for recording (Dark mode red) */
         @keyframes pulse-red {
             0% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0.4); }
             70% { box-shadow: 0 0 0 10px rgba(242, 139, 130, 0); }
             100% { box-shadow: 0 0 0 0 rgba(242, 139, 130, 0); }
         }
-        
-        /* Glassmorphism for floating UI */
-        .glass-panel {
-            background: rgba(32, 33, 36, 0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
+        .recording-pulse { animation: pulse-red 2s infinite; }
     </style>
 </head>
-<!-- Use h-[100dvh] for reliable full height on mobile browsers -->
-<body class="h-screen h-[100dvh] flex flex-col bg-black">
+<body class="h-screen flex flex-col">
 
     <!-- Loading Screen -->
     <div id="loading" class="loading-overlay">
         <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div class="text-xl font-medium text-gray-300">Vision Engine Initializing...</div>
-        <div class="text-sm text-gray-500 mt-2">Loading OpenCV & Three.js</div>
+        <div class="text-xl font-medium text-gray-300">Init Vision Engine...</div>
     </div>
 
     <!-- Hidden File Input for Video Upload -->
     <input type="file" id="videoUploadInput" accept="video/*" class="hidden" onchange="handleVideoUpload(this)">
 
-    <!-- Header (Responsive) -->
-    <header class="bg-black border-b border-gray-800 h-14 md:h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-40 relative">
+    <!-- Header -->
+    <header class="bg-black border-b border-gray-800 h-14 md:h-16 flex items-center justify-between px-4 md:px-6 shrink-0 z-10">
         <div class="flex items-center gap-2 md:gap-3">
-            <h1 class="text-lg md:text-xl font-medium text-gray-200">G-Gen <span class="hidden md:inline">Code Generator</span> <span class="text-xs text-gray-500 ml-1 font-mono">BETA</span></h1>
+            <h1 class="text-lg md:text-xl font-medium text-gray-200 truncate">G-code Gen <span class="text-xs text-gray-500 ml-1 font-mono">BETA</span></h1>
         </div>
-        
-        <!-- Controls Area -->
-        <div class="flex items-center gap-2">
+        <div class="flex gap-2">
+            <!-- Mobile Compact Controls -->
+            <button id="startCamBtn" class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-colors shadow-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                <span class="hidden md:inline">Camera</span>
+            </button>
+            <button onclick="document.getElementById('videoUploadInput').click()" class="border border-gray-600 text-gray-300 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            </button>
             
-            <!-- Mobile Quick Actions (Icons) -->
-            <div class="flex md:hidden gap-1">
-                <button onclick="document.getElementById('videoUploadInput').click()" class="p-2 text-gray-300 hover:text-white rounded-full active:bg-gray-800" title="Upload Video">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                </button>
-                <button onclick="resetApp()" class="p-2 text-gray-300 hover:text-red-400 rounded-full active:bg-gray-800" title="Reset">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                </button>
-            </div>
+            <div class="w-px h-6 bg-gray-700 mx-1 self-center"></div>
 
-            <!-- Desktop Controls -->
-            <div class="hidden md:flex gap-3">
-                <button id="startCamBtnDesktop" onclick="handleStartCamera()" class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-4 py-2 rounded-full text-sm font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                    Camera
-                </button>
-                <button onclick="document.getElementById('videoUploadInput').click()" class="border border-gray-600 hover:border-gray-400 text-gray-300 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
-                    Upload
-                </button>
-                <div class="w-px h-6 bg-gray-700 mx-1 self-center"></div>
-                <button onclick="resetApp()" class="text-gray-400 hover:text-white px-3 py-2 rounded-full text-sm transition-colors" title="Reset">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                </button>
-                <button onclick="exportGcode()" class="bg-[#303134] border border-gray-600 hover:bg-[#3c4043] text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2">
-                    Export G-code
-                </button>
+            <button onclick="resetApp()" class="text-gray-400 hover:text-white p-1.5 rounded-full transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
+            
+            <!-- Export Dropdown for Mobile? Simplified: Just Export Gcode for now on mobile, kept both for desktop -->
+            <div class="hidden md:flex gap-2">
+                 <button onclick="exportDxf()" class="bg-[#303134] border border-gray-600 text-gray-200 px-3 py-1.5 rounded-full text-xs font-medium">DXF</button>
+                 <button onclick="exportGcode()" class="bg-[#303134] border border-gray-600 text-gray-200 px-3 py-1.5 rounded-full text-xs font-medium">G-CODE</button>
             </div>
+            <!-- Mobile Export Icon -->
+            <button onclick="exportGcode()" class="md:hidden bg-[#303134] border border-gray-600 text-gray-200 px-3 py-1.5 rounded-full text-xs font-medium flex items-center">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            </button>
         </div>
     </header>
 
-    <!-- Main Content Area (Flex Item, Takes Remaining Space) -->
-    <div class="flex flex-col md:flex-row flex-1 overflow-hidden relative w-full">
+    <!-- Main Layout: Stacked on Mobile, Row on Desktop -->
+    <div class="flex flex-1 flex-col md:flex-row overflow-hidden">
         
-        <!-- Live Status Overlay -->
-        <div id="liveStatus" class="absolute top-4 left-1/2 transform -translate-x-1/2 glass-panel rounded-full px-4 py-2 flex items-center gap-3 hidden z-50 shadow-xl whitespace-nowrap pointer-events-none">
-            <div class="flex items-center gap-2">
-                <div class="w-2 h-2 rounded-full bg-[#f28b82] animate-pulse"></div>
-                <span class="text-xs font-bold text-gray-200">SCANNING</span>
-            </div>
-            <div class="h-3 w-px bg-gray-500/50"></div>
-            <div class="text-[10px] text-gray-300 font-mono">
-                Z:<span id="currentZDisplay" class="text-white font-bold ml-1">0.0</span>
-            </div>
-            <div class="h-3 w-px bg-gray-500/50"></div>
-            <div class="text-[10px] text-[#8ab4f8] font-mono" id="estTimeDisplay">00:00</div>
-        </div>
-
-        <!-- View 1: Vision & Settings (Sidebar) -->
-        <aside id="sidebarPanel" class="w-full md:w-80 bg-black border-r border-gray-800 flex flex-col overflow-y-auto z-10 absolute md:relative inset-0 md:inset-auto bg-black transition-transform duration-300">
-            <div class="p-4 md:p-5 space-y-4 md:space-y-6 pb-5">
+        <!-- Sidebar: Vision & Settings (Top on Mobile, Left on Desktop) -->
+        <aside class="w-full md:w-80 h-1/2 md:h-full bg-black md:border-r border-b md:border-b-0 border-gray-800 flex flex-col overflow-y-auto shrink-0 z-10 order-1">
+            <div class="p-4 space-y-4">
                 
                 <!-- Vision Preview Card -->
-                <div class="card p-3 md:p-4 space-y-3">
+                <div class="card p-3 space-y-2">
                     <div class="flex justify-between items-center">
-                        <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Vision Feed</h3>
+                        <h3 class="font-medium text-gray-400 text-[10px] md:text-xs uppercase tracking-wider">Feed</h3>
                         <span class="text-[10px] text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded" id="statusBadge">IDLE</span>
                     </div>
                     <div class="relative aspect-video bg-black rounded border border-gray-700 overflow-hidden group">
                         <video id="videoInput" class="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" muted playsinline></video>
                         <canvas id="canvasOutput" class="vision-canvas relative z-10"></canvas>
                         <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" id="camPlaceholder">
-                            <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mb-2">
-                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                            </div>
                             <span class="text-gray-600 text-xs font-mono">NO SIGNAL</span>
                         </div>
                     </div>
                     
-                    <!-- Controls -->
-                    <div class="space-y-4 pt-2">
-                         <div class="flex gap-2">
-                             <div class="w-1/2">
-                                <label class="text-[10px] text-gray-500 mb-1 block">MODE</label>
-                                <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded p-1.5 text-sm outline-none">
-                                    <option value="CYLINDER">Vase Mode</option>
-                                    <option value="SHAPE">Shape Scan</option>
+                    <div class="space-y-3 pt-1">
+                        <div class="grid grid-cols-2 gap-2">
+                             <div>
+                                <label class="text-[10px] text-gray-500 font-mono block mb-1">MODE</label>
+                                <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded px-2 py-1 text-xs focus:border-[#8ab4f8] outline-none">
+                                    <option value="CYLINDER">Cylinder</option>
+                                    <option value="SHAPE">Shape</option>
                                 </select>
-                             </div>
-                             <div class="w-1/2">
-                                <label class="text-[10px] text-gray-500 mb-1 block">TEXTURE DEPTH</label>
-                                <input type="range" id="textureDepth" min="0" max="10" step="0.1" value="5.0">
-                             </div>
+                            </div>
+                             <div>
+                                <label class="text-[10px] text-gray-500 font-mono block mb-1">INTENSITY</label>
+                                <input type="range" id="textureDepth" min="0" max="10" step="0.1" value="5.0" class="w-full h-4">
+                            </div>
                         </div>
 
-                        <div class="border-t border-gray-700 pt-3">
-                            <label class="text-[10px] text-gray-500 mb-1 block">EDGE THRESHOLDS (Canny)</label>
-                            <div class="space-y-2">
-                                <input type="range" id="threshold1" min="0" max="255" value="50">
-                                <input type="range" id="threshold2" min="0" max="255" value="150">
+                        <div class="border-t border-gray-700 pt-2">
+                            <label class="text-[10px] text-gray-500 font-mono block mb-1">THRESHOLDS</label>
+                            <div class="flex gap-2">
+                                <input type="range" id="threshold1" min="0" max="255" value="50" class="flex-1">
+                                <input type="range" id="threshold2" min="0" max="255" value="150" class="flex-1">
                             </div>
                         </div>
                     </div>
                     
-                    <button id="toggleScanBtn" class="w-full bg-[#303134] text-[#8ab4f8] hover:bg-[#3c4043] border border-gray-600 py-3 rounded-lg text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed flex justify-center items-center gap-2" disabled>
+                    <!-- Main Action Button -->
+                    <button id="toggleScanBtn" class="w-full bg-[#303134] text-[#8ab4f8] hover:bg-[#3c4043] border border-gray-600 py-2 md:py-3 rounded-lg text-xs md:text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed flex justify-center items-center gap-2" disabled>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>START BUILD</span>
                     </button>
-                    
-                    <!-- Mobile only camera start button for convenience -->
-                    <button id="startCamBtnMobile" onclick="handleStartCamera()" class="md:hidden w-full bg-[#8ab4f8] text-[#202124] hover:bg-[#aecbfa] py-3 rounded-lg text-sm font-medium flex justify-center items-center gap-2 mt-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                        <span>OPEN CAMERA</span>
-                    </button>
                 </div>
 
-                <!-- Print Settings (Compact Grid) -->
-                <div class="card p-4">
-                     <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider mb-3">Printer Params</h3>
-                     <div class="grid grid-cols-3 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-[9px] text-gray-500 uppercase">Bed (mm)</label>
-                            <input type="number" id="targetWidth" value="220" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-sm">
+                <!-- Print Settings Card -->
+                <div class="card p-3 space-y-3">
+                    <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Params</h3>
+                            <button onclick="fitView()" class="text-[#8ab4f8] hover:text-white p-1 rounded hover:bg-gray-700" title="Fit View">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18M3 21h18M12 8v8m-4-4h8"></path></svg>
+                            </button>
                         </div>
-                        <div class="space-y-1">
-                            <label class="text-[9px] text-gray-500 uppercase">Nozzle</label>
-                            <select id="nozzleDia" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded px-1 py-1 text-sm">
-                                <option value="0.4">0.4</option>
+                        <label class="flex items-center gap-1.5 text-[10px] text-gray-400 cursor-pointer select-none">
+                            <input type="checkbox" id="showBounds" checked onchange="toggleBoundingBox()" class="rounded border-gray-600 bg-[#303134] text-[#8ab4f8] focus:ring-0 focus:ring-offset-0">
+                            Box
+                        </label>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 md:grid-cols-2 gap-2">
+                        <div class="space-y-0.5">
+                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Size(mm)</label>
+                            <input type="number" id="targetWidth" value="240" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
+                        </div>
+                        <div class="space-y-0.5">
+                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Max H</label>
+                            <input type="number" id="modelHeight" value="240.0" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
+                        </div>
+                        <div class="space-y-0.5">
+                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Layer</label>
+                            <input type="number" id="layerHeight" value="0.2" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
+                        </div>
+                        <div class="space-y-0.5">
+                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Nozzle</label>
+                            <select id="nozzleDia" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8] outline-none">
+                                <option value="0.2">0.2</option>
+                                <option value="0.4" selected>0.4</option>
+                                <option value="0.6">0.6</option>
                                 <option value="0.8">0.8</option>
                             </select>
                         </div>
-                        <div class="space-y-1">
-                            <label class="text-[9px] text-gray-500 uppercase">Layer</label>
-                            <input type="number" id="layerHeight" value="0.2" step="0.05" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-sm">
+                        <div class="space-y-0.5">
+                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Flow</label>
+                            <input type="number" id="flowRatio" value="1.5" step="0.1" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
                         </div>
-                        <div class="space-y-1">
-                            <label class="text-[9px] text-gray-500 uppercase">Max H</label>
-                            <input type="number" id="modelHeight" value="200" onchange="updateSceneDimensions()" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-sm">
+                        <div class="space-y-0.5">
+                            <label class="text-[9px] md:text-[10px] text-gray-500 uppercase font-mono">Scan Delay</label>
+                            <input type="number" id="scanSpeed" value="100" step="10" min="20" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-xs font-mono focus:border-[#8ab4f8]">
                         </div>
-                        <div class="space-y-1">
-                            <label class="text-[9px] text-gray-500 uppercase">Speed</label>
-                            <input type="number" id="printSpeed" value="1500" class="w-full bg-[#303134] border border-gray-600 rounded px-1 py-1 text-sm">
-                        </div>
-                        <!-- Base function removed from here -->
-                     </div>
-                     <div class="hidden">
-                        <!-- Hidden inputs for logic continuity -->
-                        <input type="number" id="filDia" value="1.75">
-                        <input type="number" id="flowRatio" value="1.5">
-                        <input type="number" id="scanSpeed" value="100">
-                        <input type="checkbox" id="showBounds" checked>
-                        <!-- GenBase removed from hidden input too -->
-                     </div>
+                         <!-- Hidden Print Speed & Fil Dia for simpler UI, can be hardcoded or added back if needed -->
+                         <input type="hidden" id="printSpeed" value="1200">
+                         <input type="hidden" id="filDia" value="1.75">
+                    </div>
                 </div>
+
             </div>
         </aside>
 
-        <!-- View 2: 3D Visualization (Main Panel) -->
-        <main id="mainPanel" class="flex-1 relative bg-black w-full h-full md:block hidden z-0">
+        <!-- Main: 3D Visualization (Bottom on Mobile, Right on Desktop) -->
+        <main class="w-full md:flex-1 h-1/2 md:h-full relative bg-black order-2">
             <div id="canvas3d-container" class="absolute inset-0"></div>
             
-            <!-- Fit View Button -->
-             <button onclick="fitView()" class="absolute bottom-6 right-4 md:bottom-6 md:right-6 bg-[#202124] border border-gray-700 p-2 rounded-full text-[#8ab4f8] shadow-lg z-20">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
-             </button>
+            <!-- Live Status Overlay -->
+            <div id="liveStatus" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#202124]/90 backdrop-blur rounded-full border border-gray-700 px-4 py-1.5 flex items-center gap-3 hidden z-20 shadow-lg">
+                <div class="flex items-center gap-1.5">
+                    <div class="w-1.5 h-1.5 rounded-full bg-[#f28b82] animate-pulse"></div>
+                    <span class="text-[10px] font-bold text-gray-300 tracking-wide">ACTIVE</span>
+                </div>
+                <div class="h-3 w-px bg-gray-600"></div>
+                <div class="text-[10px] text-gray-400 font-mono flex gap-2">
+                    <span>Z: <span id="currentZDisplay" class="text-white">0.0</span></span>
+                </div>
+                <div class="h-3 w-px bg-gray-600"></div>
+                <div class="text-[10px] text-gray-400 font-mono">
+                    <span id="estTimeDisplay" class="text-[#8ab4f8]">0m</span>
+                </div>
+            </div>
             
             <!-- Empty State -->
             <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 pointer-events-none">
-                 <p class="text-sm font-mono opacity-50">3D PREVIEW AREA</p>
+                <!-- Clean empty state -->
             </div>
         </main>
     </div>
 
-    <!-- Mobile Bottom Tab Bar (Fixed height, shrink-0, not absolute) -->
-    <nav class="md:hidden shrink-0 h-16 bg-[#202124] border-t border-gray-800 flex justify-around items-center z-50">
-        <button onclick="switchTab('vision')" id="tabVision" class="flex flex-col items-center gap-1 text-[#8ab4f8] w-full h-full justify-center transition-colors duration-200">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-            <span class="text-[10px] font-medium tracking-wide">SCANNER</span>
-        </button>
-        <div class="w-px h-8 bg-gray-700"></div>
-        <button onclick="exportGcode()" class="flex flex-col items-center gap-1 text-green-400 w-full h-full justify-center active:bg-gray-800 transition-colors duration-200">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                <span class="text-[10px] font-medium tracking-wide">EXPORT</span>
-        </button>
-        <div class="w-px h-8 bg-gray-700"></div>
-        <button onclick="switchTab('3d')" id="tab3d" class="flex flex-col items-center gap-1 text-gray-500 w-full h-full justify-center transition-colors duration-200">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-            <span class="text-[10px] font-medium tracking-wide">3D VIEW</span>
-        </button>
-    </nav>
-
 <script>
-    // --- Mobile Interface Logic ---
-    function switchTab(tab) {
-        const sidebar = document.getElementById('sidebarPanel');
-        const main = document.getElementById('mainPanel');
-        const btnVision = document.getElementById('tabVision');
-        const btn3d = document.getElementById('tab3d');
-
-        if(tab === 'vision') {
-            sidebar.classList.remove('hidden');
-            main.classList.add('hidden');
-            
-            btnVision.classList.add('text-[#8ab4f8]');
-            btnVision.classList.remove('text-gray-500');
-            btn3d.classList.remove('text-[#8ab4f8]');
-            btn3d.classList.add('text-gray-500');
-        } else {
-            sidebar.classList.add('hidden');
-            main.classList.remove('hidden');
-            // Trigger resize to fix Three.js canvas size when showing
-            onWindowResize();
-            
-            btn3d.classList.add('text-[#8ab4f8]');
-            btn3d.classList.remove('text-gray-500');
-            btnVision.classList.remove('text-[#8ab4f8]');
-            btnVision.classList.add('text-gray-500');
-        }
-    }
-
     // --- Global Variables ---
     let stream = null;
     let cvReady = false;
     let video = document.getElementById('videoInput');
+    let startBtn = document.getElementById('startCamBtn');
     let toggleScanBtn = document.getElementById('toggleScanBtn');
     let streaming = false;
     let isVideoFile = false;
@@ -323,19 +272,23 @@
     let scene, camera, renderer, controls;
     let livePrintMesh; 
     let nozzleMesh;
-    let boundsBox; 
-    let gridHelper;
+    let boundsBox; // Bounding box helper
+    let gridHelper; // Global grid
     
     // UI Elements
     const sliderT1 = document.getElementById('threshold1');
     const sliderT2 = document.getElementById('threshold2');
     const sliderTex = document.getElementById('textureDepth');
     const modeSelect = document.getElementById('generationMode');
+    
     const statusBadge = document.getElementById('statusBadge');
     const camPlaceholder = document.getElementById('camPlaceholder');
     const liveStatus = document.getElementById('liveStatus');
     const zDisplay = document.getElementById('currentZDisplay');
+    // const layerDisplay = document.getElementById('currentLayerDisplay');
+    // const gcodeCountDisplay = document.getElementById('gcodeCountDisplay'); 
     const estTimeDisplay = document.getElementById('estTimeDisplay');
+    // const estFilamentDisplay = document.getElementById('estFilamentDisplay');
 
     // --- Initialization ---
 
@@ -343,24 +296,20 @@
         console.log('OpenCV Ready');
         document.getElementById('loading').style.display = 'none';
         cvReady = true;
-        // Enable buttons
-        if(document.getElementById('startCamBtnDesktop')) {
-            document.getElementById('startCamBtnDesktop').disabled = false;
-        }
+        startBtn.disabled = false;
         initThreeJS();
     }
 
     // --- Vision Logic ---
 
-    // Unified Camera Start Function
-    function handleStartCamera() {
+    startBtn.addEventListener('click', () => {
         if (streaming && !isVideoFile) {
             stopInput();
         } else {
             stopInput();
             startCamera();
         }
-    }
+    });
 
     window.handleVideoUpload = function(input) {
         if (input.files && input.files[0]) {
@@ -381,11 +330,6 @@
                 setTimeout(() => {
                     if(!streaming) return;
                     initCvObjects();
-                    // Auto-switch to vision tab on upload so user sees the "Scanning" process
-                    if(window.innerWidth < 768) {
-                        switchTab('vision');
-                    }
-                    // Auto start scanning logic
                     startScanning();
                 }, 500); 
             };
@@ -400,16 +344,7 @@
     }
 
     function startCamera() {
-        const constraints = {
-            audio: false,
-            video: {
-                facingMode: 'environment', // Prefer back camera on mobile
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        };
-
-        navigator.mediaDevices.getUserMedia(constraints)
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
             .then(function(s) {
                 stream = s;
                 video.srcObject = stream;
@@ -418,7 +353,10 @@
                 isVideoFile = false;
 
                 enableUI(true);
-                updateStartButtons(true);
+                startBtn.innerHTML = `<span class="hidden md:inline">Stop</span><span class="md:hidden">Stop</span>`;
+                startBtn.classList.replace('bg-[#8ab4f8]', 'bg-[#f28b82]'); 
+                startBtn.classList.replace('text-[#202124]', 'text-[#202124]');
+                startBtn.classList.replace('hover:bg-[#aecbfa]', 'hover:bg-[#f6aea9]');
                 
                 statusBadge.innerText = "LIVE";
                 statusBadge.classList.replace('text-[#8ab4f8]', 'text-[#81c995]');
@@ -431,32 +369,8 @@
             })
             .catch(function(err) {
                 console.error("Camera Error:", err);
-                alert("无法访问摄像头。请检查权限或尝试使用HTTPS。");
+                alert("无法访问摄像头。请允许权限。");
             });
-    }
-
-    function updateStartButtons(isRecording) {
-        const deskBtn = document.getElementById('startCamBtnDesktop');
-        const mobBtn = document.getElementById('startCamBtnMobile');
-        
-        if(deskBtn) {
-            deskBtn.innerHTML = isRecording ? `Stop` : `<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Camera`;
-            if(isRecording) {
-                 deskBtn.classList.replace('bg-[#8ab4f8]', 'bg-red-400');
-            } else {
-                 deskBtn.classList.replace('bg-red-400', 'bg-[#8ab4f8]');
-            }
-        }
-        if(mobBtn) {
-            mobBtn.innerHTML = isRecording ? `<span>STOP CAMERA</span>` : `<span>OPEN CAMERA</span>`;
-            if(isRecording) {
-                 mobBtn.classList.replace('bg-[#8ab4f8]', 'bg-red-500');
-                 mobBtn.classList.replace('text-[#202124]', 'text-white');
-            } else {
-                 mobBtn.classList.replace('bg-red-500', 'bg-[#8ab4f8]');
-                 mobBtn.classList.replace('text-white', 'text-[#202124]');
-            }
-        }
     }
 
     function stopInput() {
@@ -479,7 +393,8 @@
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         
         enableUI(false);
-        updateStartButtons(false);
+        startBtn.innerHTML = `<span class="hidden md:inline">Camera</span><span class="md:hidden">Cam</span>`;
+        startBtn.className = "bg-[#8ab4f8] hover:bg-[#aecbfa] text-[#202124] px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2";
         
         statusBadge.innerText = "IDLE";
         statusBadge.className = "text-[10px] text-[#8ab4f8] font-mono border border-[#8ab4f8]/30 px-1.5 py-0.5 rounded";
@@ -524,13 +439,13 @@
                 let cnt = contours.get(i);
                 if(cnt) {
                     if (cv.contourArea(cnt) > minArea) {
-                        cv.drawContours(src, contours, i, new cv.Scalar(138, 180, 248, 255), 2, cv.LINE_8, hierarchy, 0); 
+                        cv.drawContours(src, contours, i, new cv.Scalar(138, 180, 248, 255), 2, cv.LINE_8, hierarchy, 0); // #8ab4f8
                     }
                     cnt.delete(); 
                 }
             }
             cv.imshow('canvasOutput', src);
-        } catch (e) { console.log("Stream loop error"); }
+        } catch (e) { console.log("Stream ended/Error in loop"); }
         requestAnimationFrame(processVideoFrame);
     }
 
@@ -544,7 +459,6 @@
     function startScanning() {
         if(!streaming) return alert("Please start camera source first.");
         
-        // --- VIDEO REPLAY ---
         if(isVideoFile) {
             if (video.paused || video.ended) {
                 video.currentTime = 0;
@@ -552,9 +466,7 @@
             }
         }
         
-        // Reset State
         isScanning = true;
-        // Base gen removed
         consecutiveEmptyLayers = 0;
         lastValidPolygon = null;
         gcodeMoves = [];
@@ -573,7 +485,6 @@
         toggleScanBtn.classList.add('border-[#f28b82]', 'text-[#f28b82]');
         toggleScanBtn.classList.remove('border-gray-600', 'text-[#8ab4f8]');
         
-        // Show live status overlay (Now it's global so it works on any tab)
         liveStatus.style.display = 'flex';
         document.getElementById('emptyState').style.display = 'none';
 
@@ -581,13 +492,13 @@
         scanIntervalId = setInterval(processOneLayer, speed);
     }
 
-    // Base generation function removed
-
     function stopScanning() {
         isScanning = false;
         clearInterval(scanIntervalId);
         
-        if(isVideoFile && streaming && !video.ended) { video.pause(); }
+        if(isVideoFile && streaming && !video.ended) {
+             video.pause();
+        }
         
         toggleScanBtn.innerHTML = `<span>START BUILD</span>`;
         toggleScanBtn.classList.remove('border-[#f28b82]', 'text-[#f28b82]');
@@ -597,24 +508,57 @@
     }
 
     function updateEstimates(newMoves) {
-        // Simplified calculation for demo
-        const printSpeedSec = 1500 / 60; 
-        const travelSpeedSec = 3000 / 60;
-        let lastPos = gcodeMoves.length > newMoves.length ? gcodeMoves[gcodeMoves.length - newMoves.length - 1] : {x:0,y:0,z:0};
+        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
+        const layerH = parseFloat(document.getElementById('layerHeight').value); 
+        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
+        const flowRatio = parseFloat(document.getElementById('flowRatio').value) || 1.0;
+        const printSpeedMin = parseFloat(document.getElementById('printSpeed').value) || 1800; 
+        const printSpeedSec = printSpeedMin / 60; 
+        
+        const travelSpeedMin = 3000; 
+        const travelSpeedSec = travelSpeedMin / 60;
+        
+        const retractDist = 4.0;
+        const retractSpeedMin = 2400;
+        const retractTime = (retractDist / (retractSpeedMin / 60)) * 2; 
+
+        const lineWidth = nozzle * 1.25;
+        const filamentArea = Math.PI * Math.pow(filDia / 2, 2);
+        const ePerMM = ((lineWidth * layerH) / filamentArea) * flowRatio;
+
+        let lastPos = null;
+        if(gcodeMoves.length > newMoves.length) {
+             let prevMove = gcodeMoves[gcodeMoves.length - newMoves.length - 1];
+             lastPos = { x: prevMove.x, y: prevMove.y, z: prevMove.z };
+        } else {
+             lastPos = { x: 0, y: 0, z: 0 };
+        }
 
         newMoves.forEach(m => {
-            let dist = Math.hypot(m.x - (lastPos.x||0), m.y - (lastPos.y||0));
-            totalTimeSeconds += (dist / (m.type === 'G0' ? travelSpeedSec : printSpeedSec));
-            if(m.type !== 'G0') totalFilamentMM += (dist * 0.05); // Rough approx
-            lastPos = m;
+            let dist = Math.hypot(m.x - lastPos.x, m.y - lastPos.y);
+            
+            if(m.type === 'G0') {
+                totalTimeSeconds += (dist / travelSpeedSec);
+                if(dist > 2.0) totalTimeSeconds += retractTime;
+            } else {
+                totalTimeSeconds += (dist / printSpeedSec);
+                totalFilamentMM += (dist * ePerMM);
+            }
+            lastPos = { x: m.x, y: m.y, z: m.z };
         });
+        
         updateStatsUI();
     }
 
     function updateStatsUI() {
-        let m = Math.floor(totalTimeSeconds / 60);
+        let h = Math.floor(totalTimeSeconds / 3600);
+        let m = Math.floor((totalTimeSeconds % 3600) / 60);
         let s = Math.floor(totalTimeSeconds % 60);
-        estTimeDisplay.innerText = `${m}m ${s}s`;
+        
+        let timeStr = "";
+        if(h > 0) timeStr += `${h}h `;
+        timeStr += `${m}m`; // Simplified for mobile
+        estTimeDisplay.innerText = timeStr;
     }
 
     function processOneLayer() {
@@ -627,18 +571,26 @@
         const textureFactor = parseFloat(sliderTex.value);
 
         if (currentZ === 0) currentZ = layerH;
-        if (currentZ > maxH) { stopScanning(); return; }
+
+        if (currentZ > maxH) {
+            stopScanning();
+            return;
+        }
 
         let layerPoints = [];
 
-        // --- MODE 1: CYLINDER (VASE) ---
+        // --- MODE 1: CYLINDER TEXTURE (VASE) ---
         if (mode === 'CYLINDER') {
-            const numSegments = 60; 
+            const numSegments = 72; 
             const maxRadius = bedSize / 2; 
-            const baseRadius = Math.max(10, maxRadius - 40.0); 
+            const safetyMargin = 10.0;
+            const absoluteMaxRadius = Math.max(5, maxRadius - safetyMargin); 
+            const baseRadius = Math.max(10, maxRadius - 50.0); 
             const center = { x: video.width / 2, y: video.height / 2 };
             let radii = new Array(numSegments).fill(0); 
-            let activePoints = 0; let totalDist = 0;
+            
+            let totalDist = 0;
+            let activePoints = 0;
 
             if (contours.size() > 0) {
                  for (let i = 0; i < contours.size(); ++i) {
@@ -647,10 +599,13 @@
                         const data = cnt.data32S;
                         if(data) {
                             for (let j = 0; j < data.length; j += 2) {
-                                let dx = data[j] - center.x;
-                                let dy = data[j+1] - center.y;
+                                let px = data[j];
+                                let py = data[j+1];
+                                let dx = px - center.x;
+                                let dy = py - center.y;
                                 let dist = Math.sqrt(dx*dx + dy*dy);
-                                totalDist += dist; activePoints++;
+                                totalDist += dist;
+                                activePoints++;
                                 let angle = Math.atan2(dy, dx); 
                                 if(angle < 0) angle += Math.PI * 2;
                                 let bin = Math.floor((angle / (Math.PI * 2)) * numSegments) % numSegments;
@@ -663,19 +618,28 @@
                  }
             }
 
-            let layerThicknessOffset = activePoints > 0 ? (totalDist/activePoints)/(video.width/2) * 20.0 : 0;
+            let layerThicknessOffset = 0;
+            if (activePoints > 0) {
+                const avgDist = totalDist / activePoints;
+                const normAvg = avgDist / (video.width / 2);
+                layerThicknessOffset = normAvg * 20.0; 
+            }
 
             for (let i = 0; i <= numSegments; i++) {
                 let idx = i % numSegments;
                 let angle = (i / numSegments) * Math.PI * 2;
                 let r = baseRadius + layerThicknessOffset + (radii[idx] * textureFactor * 5.0); 
-                r = Math.min(r, maxRadius - 2);
-                layerPoints.push({ x: (bedSize / 2) + (Math.cos(angle) * r), y: (bedSize / 2) + (Math.sin(angle) * r) });
+                if (r > absoluteMaxRadius) r = absoluteMaxRadius;
+                let finalX = (bedSize / 2) + (Math.cos(angle) * r);
+                let finalY = (bedSize / 2) + (Math.sin(angle) * r);
+                layerPoints.push({ x: finalX, y: finalY });
             }
         } 
         // --- MODE 2: SHAPE SCAN ---
         else {
-             let bestPoly = null; let maxArea = 0;
+             let bestPoly = null;
+             let maxArea = 0;
+
              if(contours.size() > 0) {
                 for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
@@ -685,7 +649,11 @@
                             maxArea = area;
                             let tempPoly = [];
                             const data = cnt.data32S;
-                            for (let j = 0; j < data.length; j += 2) tempPoly.push({ x: data[j], y: data[j+1] });
+                            if(data) {
+                                for (let j = 0; j < data.length; j += 2) {
+                                    tempPoly.push({ x: data[j], y: data[j+1] });
+                                }
+                            }
                             bestPoly = tempPoly;
                         }
                         cnt.delete();
@@ -705,34 +673,55 @@
                 const centerY = (video.videoHeight * scaleFactor) / 2; 
                 const maxR = (bedSize / 2) - 5; 
                 
-                layerPoints = bestPoly.map(p => {
+                let transformedPoly = bestPoly.map(p => {
                     let relX = (p.x * scaleFactor) - centerX;
                     let relY = (p.y * scaleFactor) - centerY; 
                     let dist = Math.sqrt(relX*relX + relY*relY);
-                    if(dist > maxR) { let ratio = maxR / dist; relX *= ratio; relY *= ratio; }
-                    return { x: (bedSize / 2) + relX, y: (bedSize / 2) - relY };
+                    if(dist > maxR) {
+                        let ratio = maxR / dist;
+                        relX *= ratio;
+                        relY *= ratio;
+                    }
+                    return {
+                        x: (bedSize / 2) + relX,
+                        y: (bedSize / 2) - relY 
+                    };
                 });
-                if(layerPoints.length > 0) layerPoints.push({x: layerPoints[0].x, y: layerPoints[0].y}); // Close Loop
+
+                layerPoints = transformedPoly;
+
+                if(layerPoints.length > 0) {
+                    const first = layerPoints[0];
+                    const last = layerPoints[layerPoints.length - 1];
+                    if (first.x !== last.x || first.y !== last.y) {
+                        layerPoints.push({ x: first.x, y: first.y });
+                    }
+                }
             }
         }
 
         const isEmpty = layerPoints.length === 0;
 
         if (!isEmpty || mode === 'CYLINDER') {
-            // Base generation logic removed
-            
             consecutiveEmptyLayers = 0;
+
             let layerMoves = [];
             
             if(layerPoints.length > 0) {
                 let start = layerPoints[0];
                 layerMoves.push({ type: 'G0', x: start.x, y: start.y, z: currentZ });
+                
                 for(let i=1; i<layerPoints.length; i++) {
                     let p = layerPoints[i];
                     layerMoves.push({ type: 'G1', x: p.x, y: p.y, z: currentZ });
-                    add3DLine({x:layerPoints[i-1].x, y:layerPoints[i-1].y, z:currentZ}, {x:p.x, y:p.y, z:currentZ}, true, 'wall');
+                    add3DLine(
+                        {x:layerPoints[i-1].x, y:layerPoints[i-1].y, z:currentZ}, 
+                        {x:p.x, y:p.y, z:currentZ}, 
+                        true
+                    );
                 }
             }
+
             gcodeMoves.push(...layerMoves);
             updateEstimates(layerMoves);
             
@@ -740,22 +729,27 @@
                 let last = layerMoves[layerMoves.length-1];
                 nozzleMesh.position.set(last.x, last.y, last.z);
             }
+            
             currentZ += layerH;
             currentLayer++;
-            zDisplay.innerText = currentZ.toFixed(1);
+            
+            zDisplay.innerText = currentZ.toFixed(2);
 
         } else {
             consecutiveEmptyLayers++;
-            if(consecutiveEmptyLayers > EMPTY_LAYER_THRESHOLD) stopScanning();
+            if(consecutiveEmptyLayers > EMPTY_LAYER_THRESHOLD) {
+                console.log("Auto-stopping");
+                stopScanning();
+            }
         }
     }
 
-    // --- Three.js ---
+    // --- Three.js Dynamic Updates ---
 
     function initThreeJS() {
         const container = document.getElementById('canvas3d-container');
         scene = new THREE.Scene();
-        scene.background = new THREE.Color('#000000');
+        scene.background = new THREE.Color('#000000'); 
         scene.fog = new THREE.Fog('#000000', 100, 2000); 
 
         camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 5000);
@@ -764,10 +758,12 @@
 
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
         container.appendChild(renderer.domElement);
 
         controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
+        controls.autoRotate = false; 
         controls.dampingFactor = 0.1;
 
         const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.4);
@@ -776,18 +772,19 @@
         dirLight.position.set(50, -50, 100);
         scene.add(dirLight);
 
-        gridHelper = new THREE.GridHelper(220, 22, 0x555555, 0x222222); 
+        gridHelper = new THREE.GridHelper(220, 44, 0x555555, 0x222222); 
         gridHelper.rotation.x = Math.PI / 2;
         scene.add(gridHelper);
         
-        const nozzleGeo = new THREE.SphereGeometry(1.5, 8, 8); 
+        const nozzleGeo = new THREE.SphereGeometry(0.8, 16, 16); 
         const nozzleMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); 
         nozzleMesh = new THREE.Mesh(nozzleGeo, nozzleMat);
         scene.add(nozzleMesh);
 
         initDynamicGeometry();
         initBoundsHelper();
-        setTimeout(updateSceneDimensions, 200);
+        
+        setTimeout(updateSceneDimensions, 100);
 
         window.addEventListener('resize', onWindowResize, false);
         animate();
@@ -796,29 +793,38 @@
     function initBoundsHelper() {
         const w = parseFloat(document.getElementById('targetWidth').value);
         const h = parseFloat(document.getElementById('modelHeight').value);
+        
         const geometry = new THREE.BoxGeometry(w, w, h);
         geometry.translate(w/2, w/2, h/2); 
+        
         const edges = new THREE.EdgesGeometry(geometry);
-        boundsBox = new THREE.LineSegments(edges, new THREE.LineBasicMaterial( { color: 0x888888, transparent: true, opacity: 0.3 } ));
+        boundsBox = new THREE.LineSegments(edges, new THREE.LineBasicMaterial( { color: 0x888888, transparent: true, opacity: 0.5, depthTest: false } ));
         scene.add(boundsBox);
+        
+        toggleBoundingBox();
     }
 
     window.updateSceneDimensions = function() {
         const w = parseFloat(document.getElementById('targetWidth').value);
         const h = parseFloat(document.getElementById('modelHeight').value);
+        
         if(boundsBox) {
             boundsBox.geometry.dispose();
             const geometry = new THREE.BoxGeometry(w, w, h);
             geometry.translate(w/2, w/2, h/2);
             boundsBox.geometry = new THREE.EdgesGeometry(geometry);
         }
+        
         if(gridHelper) {
             scene.remove(gridHelper);
-            gridHelper = new THREE.GridHelper(Math.max(w*1.5, 220), 22, 0x555555, 0x222222);
+            let gridSize = Math.max(w * 1.5, 200);
+            let divisions = Math.floor(gridSize / 10);
+            gridHelper = new THREE.GridHelper(gridSize, divisions, 0x555555, 0x222222);
             gridHelper.rotation.x = Math.PI / 2;
             gridHelper.position.set(w/2, w/2, 0);
             scene.add(gridHelper);
         }
+
         fitView();
     }
     
@@ -826,45 +832,66 @@
         if(!camera || !controls) return;
         const w = parseFloat(document.getElementById('targetWidth').value);
         const h = parseFloat(document.getElementById('modelHeight').value);
-        const center = new THREE.Vector3(w/2, w/2, h/2);
+        
         const size = Math.max(w, h);
-        const dist = size * 1.5;
-        camera.position.copy(center).add(new THREE.Vector3(0, -dist, dist * 0.8));
+        const center = new THREE.Vector3(w/2, w/2, h/2); 
+        
+        const fov = camera.fov * (Math.PI / 180);
+        let dist = Math.abs(size / Math.tan(fov / 2)) * 1.5; 
+        dist = Math.max(dist, 100);
+
+        const offset = new THREE.Vector3(0, -dist, dist * 0.6); 
+        
+        camera.position.copy(center).add(offset);
         controls.target.copy(center);
         controls.update();
+    }
+
+    window.toggleBoundingBox = function() {
+        if(boundsBox) {
+            boundsBox.visible = document.getElementById('showBounds').checked;
+        }
     }
 
     function initDynamicGeometry() {
         const geometry = new THREE.BufferGeometry();
         linePositions = new Float32Array(MAX_POINTS * 3);
         lineColors = new Float32Array(MAX_POINTS * 3);
+        
         geometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
         geometry.setDrawRange(0, 0);
+
         const material = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2, transparent: true, opacity: 0.9 });
         livePrintMesh = new THREE.LineSegments(geometry, material);
         livePrintMesh.frustumCulled = false; 
         scene.add(livePrintMesh);
+        
+        drawCount = 0;
     }
 
     function add3DLine(p1, p2, isExtrude, type = 'wall') {
         if (drawCount + 2 >= MAX_POINTS) return; 
+
         if (!isExtrude) return; 
 
         linePositions[drawCount * 3] = p1.x;
         linePositions[drawCount * 3 + 1] = p1.y;
         linePositions[drawCount * 3 + 2] = p1.z;
+        
         linePositions[drawCount * 3 + 3] = p2.x;
         linePositions[drawCount * 3 + 4] = p2.y;
         linePositions[drawCount * 3 + 5] = p2.z;
 
-        let col = type === 'base' ? {r:0.30, g:0.69, b:0.31} : {r:0.54, g:0.70, b:0.97};
+        // Default Blue
+        let col = {r:0.54, g:0.70, b:0.97}; 
         
         for(let i=0; i<2; i++) { 
             lineColors[(drawCount + i) * 3] = col.r;
             lineColors[(drawCount + i) * 3 + 1] = col.g;
             lineColors[(drawCount + i) * 3 + 2] = col.b;
         }
+
         drawCount += 2;
         livePrintMesh.geometry.setDrawRange(0, drawCount);
         livePrintMesh.geometry.attributes.position.needsUpdate = true;
@@ -877,14 +904,18 @@
         currentZ = 0;
         currentLayer = 0;
         gcodeMoves = [];
+        
         livePrintMesh.geometry.setDrawRange(0, 0);
+        
         zDisplay.innerText = "0.0";
-        totalTimeSeconds = 0; totalFilamentMM = 0;
+        
+        totalTimeSeconds = 0;
+        totalFilamentMM = 0;
         updateStatsUI();
-        document.getElementById('emptyState').style.display = 'flex';
+        
         nozzleMesh.position.set(0,0,0);
         lastValidPolygon = null;
-        liveStatus.style.display = 'none'; // Hide overlay on reset
+        baseGenerated = false;
     }
 
     function animate() {
@@ -895,49 +926,138 @@
 
     function onWindowResize() {
         const container = document.getElementById('canvas3d-container');
-        // Check if visible (important for mobile tabs)
-        if(container.offsetParent === null) return;
-        
         camera.aspect = container.clientWidth / container.clientHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(container.clientWidth, container.clientHeight);
     }
 
+    window.exportDxf = function() {
+        if(gcodeMoves.length === 0) return alert("No model generated yet.");
+        
+        let dxfContent = [];
+        dxfContent.push("  0", "SECTION", "  2", "HEADER", "  9", "$ACADVER", "  1", "AC1009", "  0", "ENDSEC");
+        dxfContent.push("  0", "SECTION", "  2", "ENTITIES");
+        
+        let lastPos = {x:0, y:0, z:0};
+        
+        for (let i = 0; i < gcodeMoves.length; i++) {
+            let m = gcodeMoves[i];
+            if (m.type === 'G1') {
+                dxfContent.push("  0", "LINE");
+                dxfContent.push("  8", "0"); 
+                dxfContent.push(" 10", lastPos.x.toFixed(4));
+                dxfContent.push(" 20", lastPos.y.toFixed(4));
+                dxfContent.push(" 30", lastPos.z.toFixed(4));
+                dxfContent.push(" 11", m.x.toFixed(4));
+                dxfContent.push(" 21", m.y.toFixed(4));
+                dxfContent.push(" 31", m.z.toFixed(4));
+            }
+            lastPos = {x: m.x, y: m.y, z: m.z};
+        }
+        
+        dxfContent.push("  0", "ENDSEC", "  0", "EOF");
+        
+        const blob = new Blob([dxfContent.join('\r\n')], {type: "application/dxf"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "vision_scan_model.dxf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
     window.exportGcode = function() {
         if(gcodeMoves.length === 0) return alert("No model generated yet.");
-        const txt = [
-            ";--G-GEN MOBILE EXPORT--",
-            "M140 S60", "M104 S200", "G28", "G92 E0", "G1 Z2.0 F3000",
-            "G1 X0.1 Y20 Z0.3 F5000.0", "G1 X0.1 Y200.0 Z0.3 F1500.0 E15", "G92 E0",
-            "M82"
-        ];
         
+        let txt = [
+            ";--START GCODE--",
+            ";M104 S220 ; Set Extruder temperature",
+            ";M140 S55 ; Set Heat Bed temperature",
+            ";M190 S55 ; Wait for Heat Bed temperature",
+            ";M109 S220 ; Wait for Extruder temperature",
+            "M140 S60",
+            "M105",
+            "M190 S60",
+            "M104 S200",
+            "M105",
+            "M109 S200",
+            "G28 ; Home all axes",
+            "M117 Purge extruder",
+            "G92 E0 ; Reset Extruder",
+            "G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed",
+            "G1 X0.1 Y20 Z0.3 F5000.0 ; Move to start position",
+            "G1 X0.1 Y200.0 Z0.3 F1500.0 E15 ; Draw the first line",
+            "G1 X0.4 Y200.0 Z0.3 F5000.0 ; Move to side a little",
+            "G1 X0.4 Y20 Z0.3 F1500.0 E30 ; Draw the second line",
+            "G92 E0 ; Reset Extruder",
+            "G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed",
+            "M82 ;absolute extrusion mode",
+            ";--END OF START GCODE--"
+        ];
+
+        const nozzle = parseFloat(document.getElementById('nozzleDia').value);
         const layerH = parseFloat(document.getElementById('layerHeight').value); 
-        const filDia = 1.75;
-        const ePerMM = ((0.5 * layerH) / (Math.PI * Math.pow(filDia / 2, 2))) * 1.5;
+        const filDia = parseFloat(document.getElementById('filDia').value) || 1.75;
+        const flowRatio = parseFloat(document.getElementById('flowRatio').value) || 1.0;
+        
+        const lineWidth = nozzle * 1.25;
+        const filamentArea = Math.PI * Math.pow(filDia / 2, 2);
+        const ePerMM = ((lineWidth * layerH) / filamentArea) * flowRatio;
         
         let e = 0;
         let lastPos = {x:0, y:0};
         
+        const retractDist = 4.0;
+        const retractSpeed = 2400;
+        const printSpeed = parseFloat(document.getElementById('printSpeed').value) || 1800; 
+
         gcodeMoves.forEach((m, index) => {
             if(m.type === 'G0') {
-                if (index > 0) txt.push(`G1 F2400 E${(e - 4.0).toFixed(4)}`);
+                if (index > 0) {
+                    txt.push(`; Retract`);
+                    txt.push(`G1 F${retractSpeed} E${(e - retractDist).toFixed(5)}`);
+                }
                 txt.push(`G0 F3000 X${m.x.toFixed(3)} Y${m.y.toFixed(3)} Z${m.z.toFixed(3)}`);
-                if (index > 0) txt.push(`G1 F2400 E${e.toFixed(4)}`);
+                if (index > 0) {
+                    txt.push(`; Un-retract`);
+                    txt.push(`G1 F${retractSpeed} E${e.toFixed(5)}`);
+                }
             } else {
                 let dist = Math.hypot(m.x - lastPos.x, m.y - lastPos.y);
                 e += dist * ePerMM;
-                txt.push(`G1 F1500 X${m.x.toFixed(3)} Y${m.y.toFixed(3)} Z${m.z.toFixed(3)} E${e.toFixed(4)}`);
+                txt.push(`G1 F${printSpeed} X${m.x.toFixed(3)} Y${m.y.toFixed(3)} Z${m.z.toFixed(3)} E${e.toFixed(5)}`);
             }
             lastPos = {x:m.x, y:m.y};
         });
         
-        txt.push("G91", "G1 F1800 E-3", "G1 Z20", "G90", "M104 S0", "M140 S0", "M84");
+        txt.push(
+            "",
+            ";--END GCODE--",
+            "G91 ;Relative positioning",
+            "M220 S100 ; Reset Speed factor override percentage to default (100%)",
+            "M221 S100 ; Reset Extrude factor override percentage to default (100%)",
+            "G91 ; Set coordinates to relative",
+            "G1 F1800 E-3 ; Retract filament 3 mm to prevent oozing",
+            "G1 F3000 Z20 ; Move Z Axis up 20 mm to allow filament ooze freely",
+            "G90 ; Set coordinates to absolute",
+            "G1 X0 Y245 F1000 ; Move Heat Bed to the front for easy print removal",
+            "M106 S0 ; Turn off cooling fan",
+            "M104 S0 ; Turn off extruder",
+            "M140 S0 ; Turn off bed",
+            "M107 ; Turn off Fan",
+            "M84 ; Disable stepper motors",
+            ";--END OF END GCODE--"
+        );
+
         const blob = new Blob([txt.join('\n')], {type: "text/plain"});
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "vision_scan.gcode";
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        a.href = url;
+        a.download = "vision_lab_print.gcode";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 </script>
 </body>
