@@ -1,4 +1,4 @@
-        <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1098,7 +1098,7 @@
         keyLight.position.set(50, -50, 100);
         keyLight.castShadow = true;
         scene.add(keyLight);
-        const rimLight = new THREE.SpotLight(0x4455ff, 2.0);
+        const rimLight = new THREE.SpotLight(0xffffff, 2.0); // Modified to white
         rimLight.position.set(0, 150, 50);
         rimLight.lookAt(0, 0, 50);
         scene.add(rimLight);
@@ -1243,6 +1243,7 @@
         const geo = previewSolidMesh.geometry;
         const pos = geo.attributes.position.array;
         
+        const mode = document.getElementById('generationMode').value;
         let objContent = "# DarkLab Vision Scan Export\n";
         objContent += "o vision_mesh\n";
         
@@ -1263,7 +1264,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "vision_model.obj";
+        a.download = `G-code Generator_${mode}.obj`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1364,6 +1365,7 @@
 
     window.exportDxf = function() { /* Same as before */
         if(gcodeMoves.length === 0) return alert("No model generated yet.");
+        const mode = document.getElementById('generationMode').value;
         let dxfContent = [];
         dxfContent.push("  0", "SECTION", "  2", "HEADER", "  9", "$ACADVER", "  1", "AC1009", "  0", "ENDSEC");
         dxfContent.push("  0", "SECTION", "  2", "ENTITIES");
@@ -1387,7 +1389,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "vision_scan_model.dxf";
+        a.download = `G-code Generator_${mode}.dxf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1395,6 +1397,7 @@
 
     window.exportGcode = function() { /* Same as before */
         if(gcodeMoves.length === 0) return alert("No model generated yet.");
+        const mode = document.getElementById('generationMode').value;
         let txt = [
             ";--START GCODE--",
             "M140 S60",
@@ -1484,7 +1487,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "vision_lab_print.gcode";
+        a.download = `G-code Generator_${mode}.gcode`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
