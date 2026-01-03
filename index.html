@@ -1091,19 +1091,30 @@
         controls.enableDamping = true;
         controls.dampingFactor = 0.1;
 
-        // Lighting
-        const ambient = new THREE.AmbientLight(0x222222); 
+        // Lighting - Softened to remove hard edges
+        const ambient = new THREE.AmbientLight(0x808080); // Increased ambient for softer shadows
         scene.add(ambient);
-        const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        
+        // Soft Hemisphere Light (Sky/Ground) - prevents black shadows
+        const hemiLight = new THREE.HemisphereLight( 0xffffff, 0x444444, 0.5 );
+        hemiLight.position.set( 0, 0, 200 );
+        scene.add( hemiLight );
+
+        // Main Directional Light (Soft Key)
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.7);
         keyLight.position.set(50, -50, 100);
         keyLight.castShadow = true;
         scene.add(keyLight);
-        const rimLight = new THREE.SpotLight(0xffffff, 2.0); // Modified to white
+        
+        // Removed Rim Light (SpotLight) to fix hard boundary line
+        /* const rimLight = new THREE.SpotLight(0xffffff, 2.0); 
         rimLight.position.set(0, 150, 50);
         rimLight.lookAt(0, 0, 50);
         scene.add(rimLight);
-        const fillLight = new THREE.PointLight(0x444444, 0.5);
-        fillLight.position.set(-100, 0, 50);
+        */
+        
+        const fillLight = new THREE.PointLight(0x404040, 0.5);
+        fillLight.position.set(-100, 50, 50);
         scene.add(fillLight);
 
         gridHelper = new THREE.GridHelper(220, 44, 0x555555, 0x222222); 
@@ -1226,8 +1237,7 @@
         previewSolidMesh.receiveShadow = true;
         scene.add(previewSolidMesh);
         
-        // Fit view to mesh
-        fitView();
+        // REMOVED fitView() to keep current camera angle
     }
 
     window.exportObj = function() {
@@ -1487,7 +1497,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `G-code Generator_${mode}.gcode`;
+        a.download = "vision_lab_print.gcode";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
