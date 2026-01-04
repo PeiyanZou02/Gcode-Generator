@@ -153,7 +153,7 @@
                              <div class="flex justify-between text-xs text-gray-500 mb-2 font-mono">
                                 <span>GENERATION MODE</span>
                             </div>
-                            <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded p-2 text-sm focus:border-[#8ab4f8] outline-none">
+                            <select id="generationMode" class="w-full bg-[#303134] text-gray-200 border border-gray-600 rounded p-2 text-sm focus:border-[#8ab4f8] outline-none" onchange="updateUIParams()">
                                 <option value="ORGANIC_FOLD">Organic Deep Fold (Generative)</option>
                                 <option value="CYLINDER">Cylinder Texture (Vase)</option>
                                 <option value="SHAPE">Shape Scan (Legacy)</option>
@@ -178,7 +178,7 @@
                     </button>
                 </div>
 
-                <!-- Generative Parameters Card -->
+                <!-- Generative Parameters Card (Organic) -->
                 <div class="card p-4 space-y-4" id="organicControls">
                     <div class="border-b border-gray-700 pb-2">
                         <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Generative Params</h3>
@@ -256,6 +256,26 @@
                             </div>
                             <input type="range" id="inp-seed" min="0" max="999" value="101" step="1">
                         </div>
+                    </div>
+                </div>
+
+                <!-- Cylinder Params Card -->
+                <div class="card p-4 space-y-4 hidden" id="cylinderControls">
+                    <div class="border-b border-gray-700 pb-2">
+                        <h3 class="font-medium text-gray-400 text-xs uppercase tracking-wider">Cylinder Params</h3>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <label class="param-label">Texture Depth</label>
+                                <span id="val-texture" class="param-val">5.0</span>
+                            </div>
+                            <input type="range" id="inp-texture" min="0" max="10" value="5.0" step="0.1">
+                        </div>
+                        <label class="flex items-center gap-2 cursor-pointer hover:text-gray-300 transition-colors">
+                            <input type="checkbox" id="invertTexture" class="w-3 h-3 rounded bg-[#303134] border-gray-600 focus:ring-0 focus:ring-offset-0">
+                            <span class="text-xs text-gray-400 font-mono uppercase">Invert Texture</span>
+                        </label>
                     </div>
                 </div>
 
@@ -452,6 +472,10 @@
     const estFilamentDisplay = document.getElementById('estFilamentDisplay');
     const postProcessControls = document.getElementById('postProcessControls');
 
+    // UI Params Groups
+    const organicControls = document.getElementById('organicControls');
+    const cylinderControls = document.getElementById('cylinderControls');
+
     // --- Initialization ---
 
     function onOpenCvReady() {
@@ -460,6 +484,7 @@
         cvReady = true;
         startBtn.disabled = false;
         initThreeJS();
+        updateUIParams(); // Init UI state
     }
 
     // Auto-update value labels
@@ -470,6 +495,23 @@
             if(span) span.innerText = e.target.value;
         });
     });
+    
+    function updateUIParams() {
+        const mode = modeSelect.value;
+        
+        // Simple Toggle Logic
+        if (mode === 'ORGANIC_FOLD') {
+            organicControls.classList.remove('hidden');
+            cylinderControls.classList.add('hidden');
+        } else if (mode === 'CYLINDER') {
+            organicControls.classList.add('hidden');
+            cylinderControls.classList.remove('hidden');
+        } else {
+            // Hide both for legacy SHAPE mode
+            organicControls.classList.add('hidden');
+            cylinderControls.classList.add('hidden');
+        }
+    }
 
     // --- Vision Logic ---
 
@@ -903,7 +945,7 @@
         
         // --- MODE: CYLINDER TEXTURE (VASE) ---
         else if (mode === 'CYLINDER') {
-            const textureFactor = parseFloat(document.getElementById('textureDepth').value); // Legacy slider
+            const textureFactor = parseFloat(document.getElementById('inp-texture').value); // Legacy slider restored
             const numSegments = 72; 
             const maxRadius = bedSize / 2; 
             const absoluteMaxRadius = Math.max(5, maxRadius - 10.0); 
@@ -951,6 +993,11 @@
                 let angle = (i / numSegments) * Math.PI * 2;
                 // INVERT TEXTURE LOGIC
                 let modulation = radii[idx] * textureFactor * 5.0;
+                
+                if (document.getElementById('invertTexture').checked) {
+                    modulation = -modulation;
+                }
+
                 let r = baseRadius + layerThicknessOffset + modulation;
                 if (r < 1) r = 1;
                 if (r > absoluteMaxRadius) r = absoluteMaxRadius;
